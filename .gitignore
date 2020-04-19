@@ -1,2 +1,6 @@
 *.swp
+
+*.cmp
+*.hack
 *.out
+*.tst
