@@ -1,0 +1,4 @@
+(executable
+ (name assembler)
+ (libraries core stdio)
+ (preprocess (pps ppx_jane)))
