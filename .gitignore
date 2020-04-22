@@ -1,5 +1,8 @@
 *.swp
 
+/_build
+.merlin
+
 *.cmp
 *.hack
 *.out
