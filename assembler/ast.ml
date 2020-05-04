@@ -1,42 +1,27 @@
-type memory_location =
-  | D_register
-  | A_register
-  | Memory_at_A
+open Base
 
-type jump_type =
-  | Jgt
-  | Jeq
-  | Jge
-  | Jlt
-  | Jne
-  | Jle
-  | Jmp
+let char_to_memory_location (c : char) : Ast_types.memory_location =
+  match c with
+  | 'D' -> Ast_types.D_register
+  | 'A' -> Ast_types.A_register
+  | 'M' -> Ast_types.Memory_at_A
+  | _ -> failwith ("Unexpected memory location: " ^ (String.of_char c))
 
-type operator =
-  | Plus
-  | Minus
-  | Bit_and
-  | Bit_or
-  | Unary_minus
+let string_to_memory_location s =
+  if (String.length s) <> 1
+  then failwith ("Unexpected memory location: " ^ s)
+  else char_to_memory_location (String.get s 0)
 
-type expression =
-  | Int of int
-  | Memory of memory_location
-  | Bit_negation of expression
-  | Negative of expression
-  | Operator of operator * expression * expression
+let string_to_memory_locations s =
+  List.map (String.to_list s) ~f:char_to_memory_location
 
-type c_statement = {
-  destination: memory_location list;
-  computation: expression;
-  jump: jump_type option;
-}
-
-type a_statement =
-  | Set_to_int of int
-  | Set_to_symbol of string
-
-type statement =
-  | A_statement of a_statement
-  | C_statement of c_statement
-  | Symbol_definition of string
+let string_to_jump_type s =
+  match s with
+  | "JGT" -> Ast_types.Jgt
+  | "JEQ" -> Ast_types.Jeq
+  | "JGE" -> Ast_types.Jge
+  | "JLT" -> Ast_types.Jlt
+  | "JNE" -> Ast_types.Jne
+  | "JLE" -> Ast_types.Jle
+  | "JMP" -> Ast_types.Jmp
+  | _ -> failwith ("Unexpected jump type: " ^  s)

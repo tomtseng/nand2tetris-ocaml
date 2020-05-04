@@ -1,7 +1,13 @@
 (executable
  (name assembler)
  (libraries core stdio)
+ (modules_without_implementation ast_types)
  (preprocess (pps ppx_jane)))
+
+(rule
+ (targets lexer.ml)
+ (deps lexer.mll)
+ (action (run ocamllex %{deps})))
 
 (rule
  (targets parser.mli parser.ml)
