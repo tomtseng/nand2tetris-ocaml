@@ -2,3 +2,8 @@
  (name assembler)
  (libraries core stdio)
  (preprocess (pps ppx_jane)))
+
+(rule
+ (targets parser.mli parser.ml)
+ (deps   parser.mly)
+ (action (run menhir --explain %{deps})))
