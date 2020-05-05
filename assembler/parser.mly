@@ -14,8 +14,11 @@
 %%
 
 program:
-  | EOL* ; s = separated_list(EOL+, statement); EOF { s }
+  | EOL* ; s = list(statement_with_eol); EOF { s }
 ;
+
+statement_with_eol:
+  | s = statement ; EOL+ { s }
 
 statement:
   | s = a_instruction { Ast_types.A_instruction s }
