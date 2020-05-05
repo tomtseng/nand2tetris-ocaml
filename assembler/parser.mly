@@ -14,7 +14,7 @@
 %%
 
 program:
-  | s = separated_list(EOL+, statement); EOF { s }
+  | EOL* ; s = separated_list(EOL+, statement); EOF { s }
 ;
 
 statement:
