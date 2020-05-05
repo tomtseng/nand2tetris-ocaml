@@ -1,13 +1,13 @@
 let whitespace = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
-let comment = "//" [^'\r' '\n']* newline
+let comment = "//" [^'\r' '\n']*
 let string = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
 let int = ['0'-'9']+  (* Non-negative integer *)
 
 rule read =
   parse
   | whitespace { read lexbuf }
-  | comment { Lexing.new_line lexbuf; read lexbuf }
+  | comment { read lexbuf }
   | newline { Lexing.new_line lexbuf; Parser.EOL }
   | int { Parser.INT (int_of_string (Lexing.lexeme lexbuf)) }
   | string { Parser.STRING (Lexing.lexeme lexbuf) }
