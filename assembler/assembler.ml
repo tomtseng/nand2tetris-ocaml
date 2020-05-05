@@ -49,17 +49,17 @@ let computation_to_binary (exp : Ast_types.expression) : string =
     match e with
     | A.Int 0 -> "101010"
     | A.Int 1 -> "111111"
-    | A.Int -1 -> "111010"
     | A.Memory A.D_register -> "001100"
     | A.Memory (A.A_register | A.Memory_at_A) -> "110000"
-    | A.Bit_negation (A.Memory m) ->
-        let bin = computation_to_binary_impl (A.Memory m) in
-        (* Set last bit. *)
-        (String.drop_suffix bin 1) ^ "1"
+    | A.Negative (A.Int 1) -> "111010"
     | A.Negative (A.Memory m) ->
         let bin = computation_to_binary_impl (A.Memory m) in
         (* Set last two bits. *)
         (String.drop_suffix bin 2) ^ "2"
+    | A.Bit_negation (A.Memory m) ->
+        let bin = computation_to_binary_impl (A.Memory m) in
+        (* Set last bit. *)
+        (String.drop_suffix bin 1) ^ "1"
     | A.Operator (A.Plus, (A.Memory A.D_register), (A.Int 1)) -> "011111"
     | A.Operator (A.Plus, (A.Memory (A.A_register | A.Memory_at_A)), (A.Int 1))
       -> "110111"
@@ -76,7 +76,8 @@ let computation_to_binary (exp : Ast_types.expression) : string =
         (A.Memory (A.A_register | A.Memory_at_A))) -> "000000"
     | A.Operator (A.Bit_or, (A.Memory A.D_register),
         (A.Memory (A.A_register | A.Memory_at_A))) -> "010101"
-    | _ -> failwith "Unexpected expression"
+    | _ -> failwith
+      (Printf.sprintf !"Unexpected expression %{sexp:A.expression}" e)
   in
   leading_bit ^ (computation_to_binary_impl exp)
 
