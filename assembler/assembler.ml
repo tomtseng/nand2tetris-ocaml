@@ -20,14 +20,14 @@ let int_to_binary (integer : int) : string =
     in
     let binary_list = int_to_binary_impl integer [] in
     let num_bits = 15 in
-    let num_leading_zeros = (List.length binary_list) - num_bits in
+    let num_leading_zeros = num_bits - (List.length binary_list) in
     if num_leading_zeros < 0
     then
       failwith ("Integer larger than " ^ (string_of_int num_bits) ^ " bits: "
         ^ (string_of_int integer))
     else
       (String.make num_leading_zeros '0')
-        ^ (String.of_char_list (List.map binary_list ~f:char_of_int))
+        ^ (String.concat (List.map binary_list ~f:string_of_int))
 
 (** Returns whether the expression contains Ast_types.Memory_at_A *)
 let rec does_expression_use_memory_at_a (e : Ast_types.expression) : bool =
@@ -82,14 +82,14 @@ let computation_to_binary (exp : Ast_types.expression) : string =
 
 (** Translates a C-instruction destination to its binary representation. *)
 let destination_to_binary (dests : Ast_types.memory_location list) : string =
-  let contains_dest_to_bit (dest : Ast_types.memory_location) : char =
+  let contains_dest (dest : Ast_types.memory_location) : char =
     if List.mem dests dest ~equal:Ast_types.equal_memory_location then '1'
     else '0'
   in
   String.of_char_list [
-    contains_dest_to_bit Ast_types.A_register;
-    contains_dest_to_bit Ast_types.Memory_at_A;
-    contains_dest_to_bit Ast_types.D_register]
+    contains_dest Ast_types.A_register;
+    contains_dest Ast_types.D_register;
+    contains_dest Ast_types.Memory_at_A]
 
 (** Translates a C-instruction jump to its binary representation. *)
 let jump_to_binary (jump_opt : Ast_types.jump_type option) : string =
@@ -142,13 +142,13 @@ let parse_with_error (lexbuf : Lexing.lexbuf) : Ast_types.statement list =
 
 (** Runs the Hack assembler on the input file. **)
 let run_assembler (input_filename : string) : unit =
-  let output_filename = get_output_filename input_filename in
   let lexbuf = Lexing.from_channel (In_channel.create input_filename) in
   lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = input_filename };
   let statements = parse_with_error lexbuf in
+  let translation = List.map statements ~f:translate_statement in
+  let output_filename = get_output_filename input_filename in
   Out_channel.with_file output_filename ~f:(fun output_channel ->
-    Out_channel.output_lines output_channel
-      (List.map statements ~f:translate_statement))
+    Out_channel.output_lines output_channel translation)
 
 let command : Command.t =
   let open Command.Let_syntax in
