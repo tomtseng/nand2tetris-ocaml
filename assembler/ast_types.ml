@@ -4,7 +4,7 @@ type memory_location =
   | D_register
   | A_register
   | Memory_at_A
-  [@@deriving equal, sexp_of]
+[@@deriving equal, sexp_of]
 
 type jump_type =
   | Jgt
@@ -21,7 +21,7 @@ type operator =
   | Bit_and
   | Bit_or
   | Unary_minus
-  [@@deriving sexp_of]
+[@@deriving sexp_of]
 
 type expression =
   | Int of int
@@ -29,7 +29,7 @@ type expression =
   | Bit_negation of expression
   | Negative of expression
   | Operator of operator * expression * expression
-  [@@deriving sexp_of]
+[@@deriving sexp_of]
 
 type c_instruction = {
   destination: memory_location list;

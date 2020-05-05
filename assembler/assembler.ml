@@ -24,10 +24,10 @@ let int_to_binary (integer : int) : string =
     if num_leading_zeros < 0
     then
       failwith ("Integer larger than " ^ (string_of_int num_bits) ^ " bits: "
-        ^ (string_of_int integer))
+                ^ (string_of_int integer))
     else
       (String.make num_leading_zeros '0')
-        ^ (String.concat (List.map binary_list ~f:string_of_int))
+      ^ (String.concat (List.map binary_list ~f:string_of_int))
 
 (** Returns whether the expression contains Ast_types.Memory_at_A *)
 let rec does_expression_use_memory_at_a (e : Ast_types.expression) : bool =
@@ -36,10 +36,10 @@ let rec does_expression_use_memory_at_a (e : Ast_types.expression) : bool =
   | Ast_types.Memory _ -> false
   | Ast_types.Int _ -> false
   | Ast_types.Bit_negation e2 | Ast_types.Negative e2
-      -> does_expression_use_memory_at_a e2
+    -> does_expression_use_memory_at_a e2
   | Ast_types.Operator (_, e1, e2) ->
-      does_expression_use_memory_at_a e1 ||
-      does_expression_use_memory_at_a e2
+    does_expression_use_memory_at_a e1 ||
+    does_expression_use_memory_at_a e2
 
 (** Translates a C-instruction computation to its binary representation. *)
 let computation_to_binary (exp : Ast_types.expression) : string =
@@ -53,13 +53,13 @@ let computation_to_binary (exp : Ast_types.expression) : string =
     | A.Memory (A.A_register | A.Memory_at_A) -> "110000"
     | A.Negative (A.Int 1) -> "111010"
     | A.Negative (A.Memory m) ->
-        let bin = computation_to_binary_impl (A.Memory m) in
-        (* Set last two bits. *)
-        (String.drop_suffix bin 2) ^ "2"
+      let bin = computation_to_binary_impl (A.Memory m) in
+      (* Set last two bits. *)
+      (String.drop_suffix bin 2) ^ "2"
     | A.Bit_negation (A.Memory m) ->
-        let bin = computation_to_binary_impl (A.Memory m) in
-        (* Set last bit. *)
-        (String.drop_suffix bin 1) ^ "1"
+      let bin = computation_to_binary_impl (A.Memory m) in
+      (* Set last bit. *)
+      (String.drop_suffix bin 1) ^ "1"
     | A.Operator (A.Plus, (A.Memory A.D_register), (A.Int 1)) -> "011111"
     | A.Operator (A.Plus, (A.Memory (A.A_register | A.Memory_at_A)), (A.Int 1))
       -> "110111"
@@ -67,17 +67,17 @@ let computation_to_binary (exp : Ast_types.expression) : string =
     | A.Operator (A.Minus, (A.Memory (A.A_register | A.Memory_at_A)), (A.Int 1))
       -> "110010"
     | A.Operator (A.Plus, (A.Memory A.D_register),
-        (A.Memory (A.A_register | A.Memory_at_A))) -> "000010"
+                  (A.Memory (A.A_register | A.Memory_at_A))) -> "000010"
     | A.Operator (A.Minus, (A.Memory A.D_register),
-        (A.Memory (A.A_register | A.Memory_at_A))) -> "010011"
+                  (A.Memory (A.A_register | A.Memory_at_A))) -> "010011"
     | A.Operator (A.Minus, (A.Memory (A.A_register | A.Memory_at_A)),
-        (A.Memory A.D_register)) -> "000111"
+                  (A.Memory A.D_register)) -> "000111"
     | A.Operator (A.Bit_and, (A.Memory A.D_register),
-        (A.Memory (A.A_register | A.Memory_at_A))) -> "000000"
+                  (A.Memory (A.A_register | A.Memory_at_A))) -> "000000"
     | A.Operator (A.Bit_or, (A.Memory A.D_register),
-        (A.Memory (A.A_register | A.Memory_at_A))) -> "010101"
+                  (A.Memory (A.A_register | A.Memory_at_A))) -> "010101"
     | _ -> failwith
-      (Printf.sprintf !"Unexpected expression %{sexp:A.expression}" e)
+             (Printf.sprintf !"Unexpected expression %{sexp:A.expression}" e)
   in
   leading_bit ^ (computation_to_binary_impl exp)
 
@@ -97,14 +97,14 @@ let jump_to_binary (jump_opt : Ast_types.jump_type option) : string =
   match jump_opt with
   | None -> "000"
   | Some jump ->
-      match jump with
-      | Ast_types.Jgt -> "001"
-      | Ast_types.Jeq -> "010"
-      | Ast_types.Jge -> "011"
-      | Ast_types.Jlt -> "100"
-      | Ast_types.Jne -> "101"
-      | Ast_types.Jle -> "110"
-      | Ast_types.Jmp -> "111"
+    match jump with
+    | Ast_types.Jgt -> "001"
+    | Ast_types.Jeq -> "010"
+    | Ast_types.Jge -> "011"
+    | Ast_types.Jlt -> "100"
+    | Ast_types.Jne -> "101"
+    | Ast_types.Jle -> "110"
+    | Ast_types.Jmp -> "111"
 
 (** Translates A-instruction to binary code. *)
 let translate_a_instruction (instruction : Ast_types.a_instruction) : string =
@@ -149,7 +149,7 @@ let run_assembler (input_filename : string) : unit =
   let translation = List.map statements ~f:translate_statement in
   let output_filename = get_output_filename input_filename in
   Out_channel.with_file output_filename ~f:(fun output_channel ->
-    Out_channel.output_lines output_channel translation)
+      Out_channel.output_lines output_channel translation)
 
 let command : Command.t =
   let open Command.Let_syntax in
