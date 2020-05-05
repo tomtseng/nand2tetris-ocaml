@@ -125,16 +125,30 @@ let translate_statement (statement : Ast_types.statement) : string =
   | C_instruction s -> translate_c_instruction s
   | Symbol_definition sym -> "(TODO) New symbol: " ^ sym
 
+(** Print the position information in `lexbuf` to `out_channel`. *)
+let print_position (out_channel : Stdio.Out_channel.t) (lexbuf : Lexing.lexbuf) : unit =
+  let p = lexbuf.lex_curr_p in
+  fprintf out_channel "%s:%d:%d" p.pos_fname p.pos_lnum
+    (p.pos_cnum - p.pos_bol + 1)
+
+(** Parse the contents of lexbuf, printing any error that appears. *)
+let parse_with_error (lexbuf : Lexing.lexbuf) : Ast_types.statement list =
+  try Parser.program Lexer.read lexbuf with
+  | Parser.Error ->
+    let stack = Printexc.get_backtrace () in
+    fprintf stderr "%a: syntax error\n" print_position lexbuf;
+    fprintf stderr "%s" stack;
+    exit (-1)
+
 (** Runs the Hack assembler on the input file. **)
 let run_assembler (input_filename : string) : unit =
   let output_filename = get_output_filename input_filename in
-  In_channel.with_file input_filename ~f:(fun input_channel ->
-      Out_channel.with_file output_filename ~f:(fun output_channel ->
-        let lexbuf = Lexing.from_channel input_channel in
-        let statements = Parser.program Lexer.read lexbuf in
-        Out_channel.output_lines output_channel
-          (List.map statements ~f:translate_statement)
-      ))
+  let lexbuf = Lexing.from_channel (In_channel.create input_filename) in
+  lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = input_filename };
+  let statements = parse_with_error lexbuf in
+  Out_channel.with_file output_filename ~f:(fun output_channel ->
+    Out_channel.output_lines output_channel
+      (List.map statements ~f:translate_statement))
 
 let command : Command.t =
   let open Command.Let_syntax in
