@@ -2,6 +2,7 @@ type memory_location =
   | D_register
   | A_register
   | Memory_at_A
+  [@@deriving equal]
 
 type jump_type =
   | Jgt
@@ -40,3 +41,4 @@ type statement =
   | A_instruction of a_instruction
   | C_instruction of c_instruction
   | Symbol_definition of string
+
