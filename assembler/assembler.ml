@@ -1,6 +1,42 @@
 open Core
 open Stdio
 
+(** Table that maps program symbols to their addresses. *)
+module SymbolTable : sig
+  type t
+
+  (** Creates a table populated with default symbols. *)
+  val create : unit -> t
+
+  (** Adds (symbol, value) to the table. *)
+  val add : t -> symbol:string -> value:int -> [ `Ok | `Duplicate ]
+
+  (** [find table symbol] Finds the value in the table associated with the
+      symbol. *)
+  val find : t -> string -> int option
+end = struct
+  type t = (string, int) Hashtbl.t
+
+  let create () =
+    let table = Hashtbl.of_alist_exn (module String) [
+        ("SP", 0) ;
+        ("LCL", 1) ;
+        ("ARG", 2) ;
+        ("THIS", 3) ;
+        ("THAT", 4) ;
+        ("SCREEN", 16384) ;
+        ("KBD", 24576) ]
+    in
+    for i = 0 to 15 do
+      Hashtbl.add_exn table ~key:("R" ^ (string_of_int i)) ~data:i
+    done;
+    table
+
+  let add table ~symbol ~value = Hashtbl.add table ~key:symbol ~data:value
+
+  let find table symbol = Hashtbl.find table symbol
+end
+
 (** Returns `input_filename` but with a ".hack" extension. *)
 let get_output_filename (input_filename : string) : string =
   let
