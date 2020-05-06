@@ -23,7 +23,7 @@ statement_with_eol:
 statement:
   | s = a_instruction { Ast_types.A_instruction s }
   | s = c_instruction { Ast_types.C_instruction s }
-  | LEFT_PAREN ; s = STRING ; RIGHT_PAREN { Ast_types.Symbol_definition s }
+  | LEFT_PAREN ; s = STRING ; RIGHT_PAREN { Ast_types.Label_definition s }
 ;
 
 a_instruction:

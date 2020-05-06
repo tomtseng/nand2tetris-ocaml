@@ -44,5 +44,4 @@ type a_instruction =
 type statement =
   | A_instruction of a_instruction
   | C_instruction of c_instruction
-  | Symbol_definition of string
-
+  | Label_definition of string

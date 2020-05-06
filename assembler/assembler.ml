@@ -10,6 +10,7 @@ module SymbolTable : sig
 
   (** Adds (symbol, value) to the table. *)
   val add : t -> symbol:string -> value:int -> [ `Ok | `Duplicate ]
+  val add_exn : t -> symbol:string -> value:int -> unit
 
   (** [find table symbol] Finds the value in the table associated with the
       symbol. *)
@@ -33,6 +34,7 @@ end = struct
     table
 
   let add table ~symbol ~value = Hashtbl.add table ~key:symbol ~data:value
+  let add_exn table ~symbol ~value = Hashtbl.add_exn table ~key:symbol ~data:value
 
   let find table symbol = Hashtbl.find table symbol
 end
@@ -142,11 +144,25 @@ let jump_to_binary (jump_opt : Ast_types.jump_type option) : string =
     | Ast_types.Jle -> "110"
     | Ast_types.Jmp -> "111"
 
-(** Translates A-instruction to binary code. *)
-let translate_a_instruction (instruction : Ast_types.a_instruction) : string =
+(** [translate_a_instruction symbols instruction ~next_free_address] Translates
+    A-instruction to binary code. [next_free_address] is the next free address
+    to which a new variable symbol may be assigned.
+
+    Returns binary code as well as whether a new variable symbol was defined in
+    this instruction. *)
+let translate_a_instruction
+    (symbols : SymbolTable.t)
+    (instruction : Ast_types.a_instruction)
+    ~next_free_address:(next_free_address : int)
+  : (string * [ `New_symbol | `No_new_symbol ]) =
   match instruction with
-  | Set_to_int i -> "0" ^ (int_to_binary i)
-  | Set_to_symbol _ -> failwith "TODO not yet implemented"
+  | Set_to_int i -> ("0" ^ (int_to_binary i), `No_new_symbol)
+  | Set_to_symbol sym ->
+    match SymbolTable.find symbols sym with
+    | Some address -> ("0" ^ (int_to_binary address), `No_new_symbol)
+    | None ->
+      let () = SymbolTable.add_exn symbols ~symbol:sym ~value:next_free_address in
+      ("0" ^ (int_to_binary next_free_address), `New_symbol)
 
 (** Translates C-instruction to binary code. *)
 let translate_c_instruction (instruction : Ast_types.c_instruction) =
@@ -155,12 +171,49 @@ let translate_c_instruction (instruction : Ast_types.c_instruction) =
   ^ (destination_to_binary instruction.destination)
   ^ (jump_to_binary instruction.jump)
 
-(** Translates statement to binary code. *)
-let translate_statement (statement : Ast_types.statement) : string =
-  match statement with
-  | A_instruction s -> translate_a_instruction s
-  | C_instruction s -> translate_c_instruction s
-  | Symbol_definition sym -> "(TODO) New symbol: " ^ sym
+(** Returns table with all label symbol definitions in the program. *)
+let process_label_definitions
+    (program : Ast_types.statement list)
+    (symbols : SymbolTable.t)
+  : unit =
+  let rec process_labels_impl
+      (remaining_program : Ast_types.statement list)
+      (instruction_number : int)  (* Index of following instruction *)
+    : unit =
+    match remaining_program with
+    | [] -> ()
+    | (A_instruction _ | C_instruction _) :: p
+      -> process_labels_impl p (instruction_number + 1)
+    | (Label_definition sym) :: p ->
+      match SymbolTable.add symbols ~symbol:sym ~value:instruction_number with
+      | `Ok -> process_labels_impl p instruction_number
+      | `Duplicate -> failwith ("Duplicate label: " ^ sym)
+  in
+  process_labels_impl program 0
+
+(** Translate program from a list of statements to a list of binary instruction
+    codes. *)
+let translate_program (program : Ast_types.statement list) : string list =
+  let symbols = SymbolTable.create () in
+  let () = process_label_definitions program symbols in
+  let rec translate_program_impl
+      (remaining_program : Ast_types.statement list)
+      (next_free_address : int)  (* Next free address for variable symbols *)
+      (acc : string list)  (* Accumulated binary instruction codes in reverse order *)
+    : string list =
+    match remaining_program with
+    | [] -> List.rev acc
+    | (Label_definition _) :: p -> translate_program_impl p next_free_address acc
+    | (C_instruction s) :: p ->
+      translate_program_impl p next_free_address ((translate_c_instruction s) :: acc)
+    | (A_instruction s) :: p ->
+      match translate_a_instruction symbols s ~next_free_address:next_free_address with
+      | (instruction, `No_new_symbol) ->
+        translate_program_impl p next_free_address (instruction :: acc)
+      | (instruction, `New_symbol) ->
+        translate_program_impl p (next_free_address + 1) (instruction :: acc)
+  in
+  translate_program_impl program 16 []
 
 (** Print the position information in `lexbuf` to `out_channel`. *)
 let print_position (out_channel : Stdio.Out_channel.t) (lexbuf : Lexing.lexbuf) : unit =
@@ -182,7 +235,7 @@ let run_assembler (input_filename : string) : unit =
   let lexbuf = Lexing.from_channel (In_channel.create input_filename) in
   lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = input_filename };
   let statements = parse_with_error lexbuf in
-  let translation = List.map statements ~f:translate_statement in
+  let translation = translate_program statements in
   let output_filename = get_output_filename input_filename in
   Out_channel.with_file output_filename ~f:(fun output_channel ->
       Out_channel.output_lines output_channel translation)
