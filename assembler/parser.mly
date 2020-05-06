@@ -34,7 +34,7 @@ a_instruction:
 c_instruction:
   | memory_locations_str = STRING; EQUALS ; e = expression ; j = jump?
     {
-      { destination = Ast.string_to_memory_locations memory_locations_str;
+      { destination = Ast.memory_locations_of_string memory_locations_str;
         computation = e;
         jump = j;
       }
@@ -44,13 +44,13 @@ c_instruction:
 ;
 
 jump:
-  | SEMICOLON ; s = STRING { Ast.string_to_jump_type s }
+  | SEMICOLON ; s = STRING { Ast.jump_type_of_string s }
 ;
 
 simple_expression:
   | i = INT { Ast_types.Int i }
   | memory_str = STRING
-    { Ast_types.Memory (Ast.string_to_memory_location memory_str) }
+    { Ast_types.Memory (Ast.memory_location_of_string memory_str) }
 
 expression:
   | e = simple_expression { e }

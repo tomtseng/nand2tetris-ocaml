@@ -39,19 +39,12 @@ end = struct
   let find table symbol = Hashtbl.find table symbol
 end
 
-(** Returns `input_filename` but with a ".hack" extension. *)
-let get_output_filename (input_filename : string) : string =
-  let
-    base_filename, (_ : string option) = Filename.split_extension input_filename
-  in
-  base_filename ^ ".hack"
-
 (** Converts a non-negative integer to 15-bit binary form. *)
 let int_to_binary (integer : int) : string =
   if integer < 0
   then failwith ("Unexpected negative integer: " ^ (string_of_int integer))
   else
-    let rec int_to_binary_impl (i : int) (acc : int list) =
+    let rec int_to_binary_impl (i : int) (acc : int list) : int list =
       match i with
       | 0 -> acc
       | _ -> int_to_binary_impl (i / 2) ((i mod 2) :: acc)
@@ -166,10 +159,11 @@ let translate_a_instruction
 
 (** Translates C-instruction to binary code. *)
 let translate_c_instruction (instruction : Ast_types.c_instruction) =
-  "111"
-  ^ (computation_to_binary instruction.computation)
-  ^ (destination_to_binary instruction.destination)
-  ^ (jump_to_binary instruction.jump)
+  String.concat [
+    "111" ;
+    computation_to_binary instruction.computation ;
+    destination_to_binary instruction.destination ;
+    jump_to_binary instruction.jump ]
 
 (** Returns table with all label symbol definitions in the program. *)
 let process_label_definitions
@@ -229,6 +223,13 @@ let parse_with_error (lexbuf : Lexing.lexbuf) : Ast_types.statement list =
     fprintf stderr "%a: syntax error\n" print_position lexbuf;
     fprintf stderr "%s" stack;
     exit (-1)
+
+(** Returns `input_filename`, but with a ".hack" extension. *)
+let get_output_filename (input_filename : string) : string =
+  let
+    base_filename, (_ : string option) = Filename.split_extension input_filename
+  in
+  base_filename ^ ".hack"
 
 (** Runs the Hack assembler on the input file. **)
 let run_assembler (input_filename : string) : unit =
