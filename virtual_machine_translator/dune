@@ -1,0 +1,9 @@
+(rule
+ (targets lexer.ml)
+ (deps lexer.mll)
+ (action (run ocamllex %{deps})))
+
+(rule
+ (targets parser.mli parser.ml)
+ (deps   parser.mly)
+ (action (run menhir --explain %{deps})))
