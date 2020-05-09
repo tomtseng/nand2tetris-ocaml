@@ -53,7 +53,7 @@ statement:
 ;
 
 memory_location:
-  | seg = memory_segment ; idx = INT { { segment = seg ; index = idx } }
+  | seg = memory_segment ; idx = INT { Ast_types.{ segment = seg ; index = idx } }
 
 memory_segment:
   | ARGUMENT { Ast_types.Argument }
