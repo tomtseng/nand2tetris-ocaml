@@ -18,6 +18,8 @@ rule read =
   | "and" { Parser.BITWISE_AND }
   | "or" { Parser.BITWISE_OR }
   | "not" { Parser.BITWISE_NOT }
+  | "pop" { Parser.POP }
+  | "push" { Parser.PUSH }
   | "argument" { Parser.ARGUMENT }
   | "local" { Parser.LOCAL }
   | "static" { Parser.STATIC }
@@ -25,6 +27,7 @@ rule read =
   | "this" { Parser.THIS }
   | "that" { Parser.THAT }
   | "pointer" { Parser.POINTER }
+  | "temp" { Parser.TEMP }
   | "label" { Parser.LABEL }
   | "goto" { Parser.GOTO }
   | "if-goto" { Parser.IF_GOTO }

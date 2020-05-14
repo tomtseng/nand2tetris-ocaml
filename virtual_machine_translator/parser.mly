@@ -39,16 +39,16 @@ statement_with_eol:
   | s = statement ; EOL+ { s }
 
 statement:
-  | ADD { Ast_types.Add }
-  | SUBTRACT { Ast_types.Subtract }
-  | NEGATIVE { Ast_types.Negative }
-  | EQUALS { Ast_types.Equals }
-  | GREATER_THAN { Ast_types.Greater_than }
-  | LESS_THAN { Ast_types.Less_than }
-  | BITWISE_AND { Ast_types.Bitwise_and }
-  | BITWISE_OR { Ast_types.Bitwise_or }
-  | BITWISE_NOT { Ast_types.Bitwise_not }
-  | POP ; location = memory_location { Ast_types.Pop location }
+  | ADD { Binary_expression Add }
+  | SUBTRACT { Binary_expression Subtract }
+  | NEGATIVE { Unary_expression Negative }
+  | EQUALS { Comparison Equals }
+  | GREATER_THAN { Comparison Greater_than }
+  | LESS_THAN { Comparison Less_than }
+  | BITWISE_AND { Binary_expression Bitwise_and }
+  | BITWISE_OR { Binary_expression Bitwise_or }
+  | BITWISE_NOT { Unary_expression Bitwise_not }
+  | POP ; location = memory_location { Pop location }
   | PUSH ; location = memory_location { Ast_types.Push location }
 ;
 
@@ -56,12 +56,12 @@ memory_location:
   | seg = memory_segment ; idx = INT { Ast_types.{ segment = seg ; index = idx } }
 
 memory_segment:
-  | ARGUMENT { Ast_types.Argument }
-  | LOCAL { Ast_types.Local }
-  | STATIC { Ast_types.Static }
-  | CONSTANT { Ast_types.Constant }
-  | THIS { Ast_types.This }
-  | THAT { Ast_types.That }
-  | POINTER { Ast_types.Pointer }
-  | TEMP { Ast_types.Temp }
+  | ARGUMENT { Argument }
+  | LOCAL { Local }
+  | STATIC { Static }
+  | CONSTANT { Constant }
+  | THIS { This }
+  | THAT { That }
+  | POINTER { Pointer }
+  | TEMP { Temp }
 ;
