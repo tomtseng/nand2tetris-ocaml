@@ -96,10 +96,10 @@ let translate_comparison
     (command : Ast_types.comparison_command)
   : string list =
   let comparison_true_label =
-    Printf.sprintf "%s.comparison_%d_true" filename command_number
+    Printf.sprintf "$$%s.comparison_%d_true" filename command_number
   in
   let comparison_end_label =
-    Printf.sprintf "$%s.comparison_%d_end" filename command_number
+    Printf.sprintf "$$%s.comparison_%d_end" filename command_number
   in
   let jump =
     match command with
@@ -205,7 +205,6 @@ let translate_push
     "A=M-1" ;
     "M=D" ;
   ]
-
 
 (** [translate filename command_number command] Translates virtual machine
     command [command] to Hack assembly code.
