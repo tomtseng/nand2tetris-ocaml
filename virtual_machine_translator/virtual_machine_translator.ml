@@ -1,6 +1,44 @@
 open Core
 open Stdio
 
+(** State of virtual-machine-code-to-hack-assembly translator. *)
+module TranslatorState : sig
+  type t
+
+  (** [create base_filename] Initializes translator state for translating a file
+      with base name [base_filename]. *)
+  val create : string -> t
+
+  (** [update t command] Updates translator state for processing next command
+      [command]. *)
+  val update : t -> Ast_types.command -> t
+
+  (** Get name of current file being translated. *)
+  val get_filename : t -> string
+
+  (** Get name of current function being translated. *)
+  val get_function_name : t -> string
+
+  (** Get unique index of command in file being translated.*)
+  val get_command_number : t -> int
+end = struct
+  type t = {
+    base_filename : string;
+    function_name : string;
+    command_number : int;
+  }
+
+  let create filename =
+    { base_filename = filename ; function_name = "" ; command_number = 0 ; }
+
+  let update state _ =
+    { state with command_number = state.command_number + 1 }
+
+  let get_filename state = state.base_filename
+  let get_function_name state = state.function_name
+  let get_command_number state = state.command_number
+end
+
 (** Returns `input_filename`, but with a ".asm" extension. *)
 let get_asm_output_filename (input_filename : string) : string =
   let
@@ -91,10 +129,11 @@ let translate_unary_expression (expr : Ast_types.unary_expression) : string list
 
 (* Translate Equals, Greater_than, Less_than *)
 let translate_comparison
-    (filename : string)
-    (command_number : int)
+    (state : TranslatorState.t)
     (command : Ast_types.comparison_command)
   : string list =
+  let filename = TranslatorState.get_filename state in
+  let command_number = TranslatorState.get_command_number state in
   let comparison_true_label =
     Printf.sprintf "$$%s.comparison_%d_true" filename command_number
   in
@@ -136,9 +175,10 @@ let translate_comparison
 (** Generate assembly instructions that place the memory location in register A.
     Register D's contents may be erased in the process. *)
 let translate_retrieve_address
-    (filename : string)
+    (state : TranslatorState.t)
     (location : Ast_types.memory_location)
   : string list =
+  let filename = TranslatorState.get_filename state in
   match location.segment with
   | Argument | Local | This | That ->
     let register =
@@ -163,10 +203,10 @@ let translate_retrieve_address
 
 (** Translate push command. *)
 let translate_pop
-    (filename : string)
+    (state : TranslatorState.t)
     (location : Ast_types.memory_location)
   : string list =
-  (translate_retrieve_address filename location) @
+  (translate_retrieve_address state location) @
   [
     (* Store memory address in scratch register. *)
     "D=A" ;
@@ -187,7 +227,7 @@ let translate_pop
 
 (** Translate push command. *)
 let translate_push
-    (filename : string)
+    (state : TranslatorState.t)
     (location : Ast_types.memory_location)
   : string list =
   (* Assembly commands to fetch the contents of the memory location into
@@ -195,7 +235,7 @@ let translate_push
   let retrieve_to_d_register_assembly =
     match location.segment with
     | Argument | Local | Static | This | That | Pointer | Temp ->
-      (translate_retrieve_address filename location) @ [ "D=M" ]
+      (translate_retrieve_address state location) @ [ "D=M" ]
     | Constant -> [ Printf.sprintf "@%d" location.index ; "D=A" ]
   in
   retrieve_to_d_register_assembly @
@@ -206,28 +246,38 @@ let translate_push
     "M=D" ;
   ]
 
-(** [translate filename command_number command] Translates virtual machine
-    command [command] to Hack assembly code.
-
-    [filename] should be a unique identifier for the file that [command] appears
-    in, and [command_number] should be unique for each command in the file. *)
-let translate
-    (filename : string)
-    (command_number : int)
-    (command : Ast_types.command)
+(** Translates virtual machine commands to Hack assembly code. *)
+let translate_commands
+    (state : TranslatorState.t)
+    (commands : Ast_types.command list)
   : string list =
-  match command with
-  | Pop location -> translate_pop filename location
-  | Push location -> translate_push filename location
-  | Binary_expression e -> translate_binary_expression e
-  | Unary_expression e -> translate_unary_expression e
-  | Comparison c -> translate_comparison filename command_number c
+  let rec translate_commands_impl
+      (current_state : TranslatorState.t)
+      (remaining_commands : Ast_types.command list)
+      (acc : string list list)
+    : string list =
+    match remaining_commands with
+    | [] -> acc |> List.rev |> List.concat
+    | command :: tail_commands ->
+      let next_state = TranslatorState.update current_state command in
+      let command_translation =
+        match command with
+        | Pop location -> translate_pop next_state location
+        | Push location -> translate_push next_state location
+        | Binary_expression e -> translate_binary_expression e
+        | Unary_expression e -> translate_unary_expression e
+        | Comparison c -> translate_comparison next_state c
+      in
+      translate_commands_impl next_state tail_commands (command_translation :: acc)
+  in
+  translate_commands_impl state commands []
 
 (** Translates file to Hack assembly. *)
 let translate_file (filename : string) : string list =
   let file_commands = get_file_commands filename in
   let base_filename = Filename.basename filename in
-  List.concat_mapi file_commands ~f:(translate base_filename)
+  let state = TranslatorState.create base_filename in
+  translate_commands state file_commands
 
 (** Runs the VM translator on the input path. *)
 let run_translator (input_path : string) : unit =
