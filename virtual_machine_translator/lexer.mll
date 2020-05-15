@@ -4,6 +4,8 @@ let comment = "//" [^'\r' '\n']*
 let symbol = ['a'-'z' 'A'-'Z' '_' '.' ':'] ['a'-'z' 'A'-'Z' '_' '.' ':' '0'-'9']*
 let integer = ['0'-'9']+  (* Non-negative integer *)
 
+(* note: assumes that functions and labels are not named after keywords like
+   "add" *)
 rule read =
   parse
   | whitespace { read lexbuf }
