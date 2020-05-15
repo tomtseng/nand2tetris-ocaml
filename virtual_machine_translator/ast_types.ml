@@ -34,3 +34,11 @@ type command =
   | Binary_expression of binary_expression
   | Unary_expression of unary_expression
   | Comparison of comparison_command
+  | Label of string
+  | Goto of string
+  | If_goto of string
+  (* (function name, number of argument) *)
+  | Function of string * int
+  (* (function name, number of arguments pushed by caller) *)
+  | Call of string * int
+  | Return

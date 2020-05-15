@@ -246,6 +246,33 @@ let translate_push
     "M=D" ;
   ]
 
+(** Translate label string to its assembly form. *)
+let translate_label (state : TranslatorState.t) (label : string) : string =
+  let func_name = TranslatorState.get_function_name state in
+  Printf.sprintf "%s$%s" func_name label
+
+(** Translate label command. *)
+let translate_label_command (state : TranslatorState.t) (label : string)
+  : string list =
+  [ Printf.sprintf "(%s)" (translate_label state label) ]
+
+(** Translate goto command. *)
+let translate_goto (state : TranslatorState.t) (label : string) : string list =
+  [ Printf.sprintf "@%s" (translate_label state label) ; "0;JMP" ]
+
+(** Translate if-goto command *)
+let translate_if_goto (state : TranslatorState.t) (label : string) : string list =
+  [
+    (* Pop from top of stack into register D. *)
+    "@SP" ;
+    "M=M-1" ;
+    "A=M" ;
+    "D=M" ;
+
+    Printf.sprintf "@%s" (translate_label state label) ;
+    "D;JNE" ;
+  ]
+
 (** Translates virtual machine commands to Hack assembly code. *)
 let translate_commands
     (state : TranslatorState.t)
@@ -267,6 +294,12 @@ let translate_commands
         | Binary_expression e -> translate_binary_expression e
         | Unary_expression e -> translate_unary_expression e
         | Comparison c -> translate_comparison next_state c
+        | Label label -> translate_label_command next_state label
+        | Goto label -> translate_goto next_state label
+        | If_goto label -> translate_if_goto next_state label
+        | Function _
+        | Call _
+        | Return -> failwith "not implemented"
       in
       translate_commands_impl next_state tail_commands (command_translation :: acc)
   in

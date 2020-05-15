@@ -50,6 +50,12 @@ statement:
   | BITWISE_NOT { Unary_expression Bitwise_not }
   | POP ; location = memory_location { Pop location }
   | PUSH ; location = memory_location { Ast_types.Push location }
+  | LABEL ; label = SYMBOL { Label label }
+  | GOTO ; label = SYMBOL { Goto label }
+  | IF_GOTO ; label = SYMBOL { If_goto label }
+  | FUNCTION ; func_name = SYMBOL ; argc = INT { Function (func_name, argc)  }
+  | CALL ; func_name = SYMBOL ; pushed_args = INT { Call (func_name, pushed_args) }
+  | RETURN { Return }
 ;
 
 memory_location:
