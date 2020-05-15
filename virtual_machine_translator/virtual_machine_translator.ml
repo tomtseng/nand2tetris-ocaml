@@ -84,6 +84,7 @@ let get_file_commands (input_filename : string) : Ast_types.command list =
   lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = input_filename };
   parse_with_error lexbuf
 
+(** Bootstrapping code for the beginning of translated program. *)
 let assembly_preamble =
   [
     (* Initialize stack pointer *)
@@ -93,7 +94,7 @@ let assembly_preamble =
     "M=D" ;
   ]
 
-(* Translate Add, Subtract, Bitwise_and, Bitwise_or *)
+(** Translate Add, Subtract, Bitwise_and, Bitwise_or *)
 let translate_binary_expression (expr : Ast_types.binary_expression) : string list =
   let operation =
     match expr with
@@ -114,7 +115,7 @@ let translate_binary_expression (expr : Ast_types.binary_expression) : string li
     "M=M-1" ;
   ]
 
-(* Translate Negative, Bitwise_not *)
+(** Translate Negative, Bitwise_not *)
 let translate_unary_expression (expr : Ast_types.unary_expression) : string list =
   let operation =
     match expr with
@@ -127,7 +128,7 @@ let translate_unary_expression (expr : Ast_types.unary_expression) : string list
     Printf.sprintf "M=%s" operation ;
   ]
 
-(* Translate Equals, Greater_than, Less_than *)
+(** Translate Equals, Greater_than, Less_than *)
 let translate_comparison
     (state : TranslatorState.t)
     (command : Ast_types.comparison_command)
