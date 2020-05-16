@@ -9,8 +9,8 @@ Run the translator:
   dune exec ./virtual_machine_translator.exe <input file or directory>
 ```
 
-The input must either be a .vm file or a directory holding .vm files at the top
-level. The output will be  .asm file in the same directory as the input.
+The input must either be a `.vm` file or a directory holding `.vm` files at the
+top level. The output will be a `.asm` file in the same directory as the input.
 
 The input needs to contain a function named "Sys.init", so the translator won't
 work correctly on any test file for Project 7 or on some of the test files for

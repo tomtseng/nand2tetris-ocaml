@@ -9,5 +9,6 @@ Run the compiler:
   dune exec ./jack_compiler.exe <input file or directory>
 ```
 
-The input must either be a .jack file or a directory holding .jack files at the top
-level. The output will be  .vm file in the same directory as the input.
+The input must either be a `.jack` file or a directory holding `.jack` files at
+the top level. The output will be `.vm` files in the same directory as the
+`.jack` files.
