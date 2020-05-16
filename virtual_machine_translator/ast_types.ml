@@ -37,8 +37,8 @@ type command =
   | Label of string
   | Goto of string
   | If_goto of string
-  (* (function name, number of argument) *)
+  (* (function name, number of local variables for function) *)
   | Function of string * int
-  (* (function name, number of arguments pushed by caller) *)
+  (* (function name, number of arguments for function) *)
   | Call of string * int
   | Return

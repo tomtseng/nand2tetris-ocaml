@@ -13,13 +13,13 @@ module TranslatorState : sig
       [command]. *)
   val update : t -> Ast_types.command -> t
 
-  (** Get name of current file being translated. *)
+  (** Gets name of current file being translated. *)
   val get_filename : t -> string
 
-  (** Get name of current function being translated. *)
+  (** Gets name of current function being translated. *)
   val get_function_name : t -> string
 
-  (** Get unique index of command in file being translated.*)
+  (** Gets unique index of command in file being translated.*)
   val get_command_number : t -> int
 end = struct
   type t = {
@@ -31,20 +31,33 @@ end = struct
   let create filename =
     { base_filename = filename ; function_name = "" ; command_number = 0 ; }
 
-  let update state _ =
-    { state with command_number = state.command_number + 1 }
+  let update state command =
+    let incremented_state =
+      { state with command_number = state.command_number + 1 }
+    in
+    match command with
+    | Ast_types.Function (func_name, _) ->
+      { incremented_state with function_name = func_name }
+    | Pop _ | Push _ | Binary_expression _ | Unary_expression _ | Comparison _
+    | Label _ | Goto _ | If_goto _ | Call _ | Return -> incremented_state
 
   let get_filename state = state.base_filename
   let get_function_name state = state.function_name
   let get_command_number state = state.command_number
 end
 
-(** Returns `input_filename`, but with a ".asm" extension. *)
-let get_asm_output_filename (input_filename : string) : string =
-  let
-    base_filename, (_ : string option) = Filename.split_extension input_filename
-  in
-  base_filename ^ ".asm"
+(** Returns name of output `.asm` file. *)
+let get_asm_output_filename (input_path : string) : string =
+  match Sys.is_directory input_path with
+  | `Yes ->
+    let base_filename = Filename.basename input_path in
+    String.concat [input_path ; "/" ; base_filename ; ".asm"]
+  | `No ->
+    let extensionless_file_path, (_ : string option) =
+      Filename.split_extension input_path
+    in
+    extensionless_file_path ^ ".asm"
+  | `Unknown -> failwith (Printf.sprintf "Can't determine file type: %s" input_path)
 
 (** Returns list of input .vm files.
  *
@@ -63,13 +76,13 @@ let get_input_files (input_path : string) : string list =
   | `No -> [ input_path ]
   | `Unknown -> failwith (Printf.sprintf "Can't determine file type: %s" input_path)
 
-(** Print the position information in `lexbuf` to `out_channel`. *)
+(** Prints the position information in `lexbuf` to `out_channel`. *)
 let print_position (out_channel : Stdio.Out_channel.t) (lexbuf : Lexing.lexbuf) : unit =
   let p = lexbuf.lex_curr_p in
   fprintf out_channel "%s:%d:%d" p.pos_fname p.pos_lnum
     (p.pos_cnum - p.pos_bol + 1)
 
-(** Parse the contents of lexbuf, printing any error that appears. *)
+(** Parses the contents of lexbuf, printing any error that appears. *)
 let parse_with_error (lexbuf : Lexing.lexbuf) : Ast_types.command list =
   try Parser.program Lexer.read lexbuf with
   | Parser.Error ->
@@ -78,23 +91,66 @@ let parse_with_error (lexbuf : Lexing.lexbuf) : Ast_types.command list =
     fprintf stderr "%s" stack;
     exit (-1)
 
-(** Parse file into virtual machine commands. *)
+(** Parses file into virtual machine commands. *)
 let get_file_commands (input_filename : string) : Ast_types.command list =
   let lexbuf = Lexing.from_channel (In_channel.create input_filename) in
   lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = input_filename };
   parse_with_error lexbuf
 
-(** Bootstrapping code for the beginning of translated program. *)
-let assembly_preamble =
-  [
-    (* Initialize stack pointer *)
-    "@256" ;
-    "D=A" ;
-    "@SP";
-    "M=D" ;
-  ]
+(** Concatenate list of assembly of commands into a single string.*)
+let concat_commands : string list -> string = String.concat ~sep:"\n"
 
-(** Translate Add, Subtract, Bitwise_and, Bitwise_or *)
+(** Assembly commands that push the contents of D register onto the stack. *)
+let push_d_register_onto_stack : string =
+  concat_commands
+    [
+      "@SP" ;
+      "M=M+1" ;
+      "A=M-1" ;
+      "M=D" ;
+    ]
+
+(** Assembly commands that pop the top of the stack into the D register. *)
+let pop_stack_to_d_register : string =
+  concat_commands
+    [
+      "@SP" ;
+      "M=M-1" ;
+      "A=M" ;
+      "D=M";
+    ]
+
+(** Constructs label. Labels of different "types", specified by
+    type_description, will not conflict so long as no distinct type is a prefix
+    of another. *)
+let get_label (type_description : string) (arguments : string list) : string =
+  Printf.sprintf "%s$%s" type_description (String.concat ~sep:"$" arguments)
+
+(** Gets the assembly label for label command. *)
+let get_label_label (state : TranslatorState.t) (label : string) : string =
+  let function_name = TranslatorState.get_function_name state in
+  get_label "label" [function_name ; label]
+
+(** Gets the assembly label for a function with name [func_name]. *)
+let get_function_label (function_name : string) : string =
+  get_label "func" [function_name]
+
+(** Gets the label for a static variable. *)
+let get_static_label
+    (state : TranslatorState.t)
+    (memory_location_index : int)
+  : string =
+  get_label
+    "static"
+    [ TranslatorState.get_filename state ; string_of_int memory_location_index ]
+
+(** Gets the label to return to after a function call. *)
+let get_return_label (state: TranslatorState.t) : string =
+  let filename = TranslatorState.get_filename state in
+  let command_number = TranslatorState.get_command_number state |> string_of_int in
+  get_label "return" [filename ; command_number]
+
+(** Translates Add, Subtract, Bitwise_and, Bitwise_or *)
 let translate_binary_expression (expr : Ast_types.binary_expression) : string list =
   let operation =
     match expr with
@@ -128,19 +184,15 @@ let translate_unary_expression (expr : Ast_types.unary_expression) : string list
     Printf.sprintf "M=%s" operation ;
   ]
 
-(** Translate Equals, Greater_than, Less_than *)
+(** Translates Equals, Greater_than, Less_than *)
 let translate_comparison
     (state : TranslatorState.t)
     (command : Ast_types.comparison_command)
   : string list =
   let filename = TranslatorState.get_filename state in
-  let command_number = TranslatorState.get_command_number state in
-  let comparison_true_label =
-    Printf.sprintf "$$%s.comparison_%d_true" filename command_number
-  in
-  let comparison_end_label =
-    Printf.sprintf "$$%s.comparison_%d_end" filename command_number
-  in
+  let command_number = TranslatorState.get_command_number state |> string_of_int in
+  let comparison_true_label = get_label "comp_true" [filename ; command_number] in
+  let comparison_end_label = get_label "comp_end" [filename ; command_number] in
   let jump =
     match command with
     | Equals -> "JEQ"
@@ -173,13 +225,12 @@ let translate_comparison
     "M=D" ;
   ]
 
-(** Generate assembly instructions that place the memory location in register A.
+(** Generates assembly instructions that place the memory location in register A.
     Register D's contents may be erased in the process. *)
 let translate_retrieve_address
     (state : TranslatorState.t)
     (location : Ast_types.memory_location)
   : string list =
-  let filename = TranslatorState.get_filename state in
   match location.segment with
   | Argument | Local | This | That ->
     let register =
@@ -199,10 +250,10 @@ let translate_retrieve_address
     ]
   | Pointer -> [ Printf.sprintf "@%d" (3 + location.index) ]
   | Temp -> [ Printf.sprintf "@%d" (5 + location.index) ]
-  | Static ->  [ Printf.sprintf "@%s.%d" filename location.index ]
+  | Static ->  [ Printf.sprintf "@%s" (get_static_label state location.index) ]
   | Constant -> failwith "unexpected memory segment"
 
-(** Translate push command. *)
+(** Translates push command. *)
 let translate_pop
     (state : TranslatorState.t)
     (location : Ast_types.memory_location)
@@ -214,11 +265,7 @@ let translate_pop
     "@R13" ;  (* scratch register *)
     "M=D" ;
 
-    (* Pop stack. *)
-    "@SP" ;
-    "M=M-1" ;
-    "A=M" ;
-    "D=M";
+    pop_stack_to_d_register ;
 
     (* Store result in memory address. *)
     "@R13" ;
@@ -226,7 +273,7 @@ let translate_pop
     "M=D" ;
   ]
 
-(** Translate push command. *)
+(** Translates push command. *)
 let translate_push
     (state : TranslatorState.t)
     (location : Ast_types.memory_location)
@@ -239,39 +286,148 @@ let translate_push
       (translate_retrieve_address state location) @ [ "D=M" ]
     | Constant -> [ Printf.sprintf "@%d" location.index ; "D=A" ]
   in
-  retrieve_to_d_register_assembly @
-  [
-    "@SP" ;
-    "M=M+1" ;
-    "A=M-1" ;
-    "M=D" ;
-  ]
+  retrieve_to_d_register_assembly @ [push_d_register_onto_stack]
 
-(** Translate label string to its assembly form. *)
-let translate_label (state : TranslatorState.t) (label : string) : string =
-  let func_name = TranslatorState.get_function_name state in
-  Printf.sprintf "%s$%s" func_name label
-
-(** Translate label command. *)
+(** Translates label command. *)
 let translate_label_command (state : TranslatorState.t) (label : string)
   : string list =
-  [ Printf.sprintf "(%s)" (translate_label state label) ]
+  [ Printf.sprintf "(%s)" (get_label_label state label) ]
 
-(** Translate goto command. *)
+(** Translates goto command. *)
 let translate_goto (state : TranslatorState.t) (label : string) : string list =
-  [ Printf.sprintf "@%s" (translate_label state label) ; "0;JMP" ]
+  [ Printf.sprintf "@%s" (get_label_label state label) ; "0;JMP" ]
 
-(** Translate if-goto command *)
+(** Translates if-goto command *)
 let translate_if_goto (state : TranslatorState.t) (label : string) : string list =
   [
-    (* Pop from top of stack into register D. *)
-    "@SP" ;
-    "M=M-1" ;
-    "A=M" ;
-    "D=M" ;
-
-    Printf.sprintf "@%s" (translate_label state label) ;
+    pop_stack_to_d_register ;
+    Printf.sprintf "@%s" (get_label_label state label) ;
     "D;JNE" ;
+  ]
+
+(** Translates function declaration with name [func_name] and
+    [num_local_variables] local variables. *)
+let translate_function
+    (function_name : string)
+    (num_local_variables : int)
+  : string list =
+  let initialize_local_variables =
+    "D=0"
+    :: (List.init num_local_variables ~f:(fun _ -> push_d_register_onto_stack))
+  in
+  (Printf.sprintf "(%s)" (get_function_label function_name))
+  :: initialize_local_variables
+
+(** Translates function call with name [func_name] and [num_args] arguments
+    already pushed. *)
+let translate_call
+    (state : TranslatorState.t)
+    (function_name : string)
+    (num_arguments : int)
+  : string list =
+  let return_label = get_return_label state in
+  let save_segment_on_stack (segment : string) : string =
+    concat_commands
+      [
+        Printf.sprintf "@%s" segment ;
+        "D=M" ;
+        push_d_register_onto_stack
+      ]
+  in
+  [
+    (* Save return address on stack. *)
+    Printf.sprintf "@%s" return_label ;
+    "D=A" ;
+    push_d_register_onto_stack ;
+
+    (* Save memory segments on stack. *)
+    save_segment_on_stack "LCL" ;
+    save_segment_on_stack "ARG" ;
+    save_segment_on_stack "THIS" ;
+    save_segment_on_stack "THAT" ;
+
+    (* Reposition ARG pointer. *)
+    Printf.sprintf "@%d" (num_arguments + 5) ;
+    "D=A" ;
+    "@SP" ;
+    "D=M-D" ;
+    "@ARG" ;
+    "M=D" ;
+
+    (* Reposition LCL pointer. *)
+    "@SP" ;
+    "D=M" ;
+    "@LCL" ;
+    "M=D" ;
+
+    (* Invoke the function. *)
+    Printf.sprintf "@%s" (get_function_label function_name) ;
+    "0;JMP" ;
+
+    Printf.sprintf "(%s)" return_label ;
+  ]
+
+(** Translates return command. *)
+let translate_return : string list =
+  (* Points register A to a scratch register. *)
+  let at_scratch_register = "@R13" in
+  (* Pops from scratch register into register D as if the scratch register
+     points to the top of a stack. *)
+  let pop_from_scratch_register : string =
+    concat_commands
+      [
+        at_scratch_register ;
+        "M=M-1" ;
+        "A=M" ;
+        "D=M" ;
+      ]
+  in
+  let restore_segment (segment : string) : string =
+    concat_commands
+      [
+        pop_from_scratch_register;
+        Printf.sprintf "@%s" segment ;
+        "M=D" ;
+      ]
+  in
+  [
+    (* Point scratch register to previous stack frame. *)
+    "@LCL" ;
+    "D=M" ;
+    at_scratch_register ;
+    "M=D" ;
+
+    (* Save return address, which may be overwritten by the return value. *)
+    "@5" ;
+    "D=A" ;
+    "@LCL" ;
+    "A=M-D" ;
+    "D=M" ;
+    "@R14" ;  (* second scratch register *)
+    "M=D" ;
+
+    (* Write return value. *)
+    pop_stack_to_d_register ;
+    "@ARG" ;
+    "A=M" ;
+    "M=D" ;
+
+    (* Restore stack pointer. *)
+    "@ARG" ;
+    "D=M" ;
+    "@SP" ;
+    "M=D+1" ;
+
+    (* Restore memory segments. *)
+    restore_segment "THAT" ;
+    restore_segment "THIS" ;
+    restore_segment "ARG" ;
+    restore_segment "LCL" ;
+
+    (* Go to return address. *)
+    "@R14" ;
+    "A=M" ;
+    "0;JMP" ;
   ]
 
 (** Translates virtual machine commands to Hack assembly code. *)
@@ -298,9 +454,11 @@ let translate_commands
         | Label label -> translate_label_command next_state label
         | Goto label -> translate_goto next_state label
         | If_goto label -> translate_if_goto next_state label
-        | Function _
-        | Call _
-        | Return -> failwith "not implemented"
+        | Function (function_name, num_local_variables)
+          -> translate_function function_name num_local_variables
+        | Call (function_name, num_arguments)
+          -> translate_call next_state function_name num_arguments
+        | Return -> translate_return
       in
       translate_commands_impl next_state tail_commands (command_translation :: acc)
   in
@@ -313,14 +471,29 @@ let translate_file (filename : string) : string list =
   let state = TranslatorState.create base_filename in
   translate_commands state file_commands
 
+(** Bootstrapping code for the beginning of a translated program. *)
+let assembly_preamble : string list =
+  let state = TranslatorState.create "__preamble" in
+  List.concat
+    [
+      [
+        (* Initialize stack pointer *)
+        "@256" ;
+        "D=A" ;
+        "@SP";
+        "M=D" ;
+      ] ;
+      translate_call state "Sys.init" 0 ;
+    ]
+
 (** Runs the VM translator on the input path. *)
 let run_translator (input_path : string) : unit =
   let input_files = get_input_files input_path in
   let output_filename = get_asm_output_filename input_path in
-  let assembly =
-    List.append assembly_preamble List.(input_files >>= translate_file)
-  in
-  Out_channel.write_lines output_filename assembly
+  let translation = List.(input_files >>= translate_file) in
+  Out_channel.with_file output_filename ~f:(fun output_channel ->
+      Out_channel.output_lines output_channel assembly_preamble ;
+      Out_channel.output_lines output_channel translation)
 
 let command : Command.t =
   let open Command.Let_syntax in

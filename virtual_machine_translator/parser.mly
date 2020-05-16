@@ -53,8 +53,10 @@ statement:
   | LABEL ; label = SYMBOL { Label label }
   | GOTO ; label = SYMBOL { Goto label }
   | IF_GOTO ; label = SYMBOL { If_goto label }
-  | FUNCTION ; func_name = SYMBOL ; argc = INT { Function (func_name, argc)  }
-  | CALL ; func_name = SYMBOL ; pushed_args = INT { Call (func_name, pushed_args) }
+  | FUNCTION ; function_name = SYMBOL ; num_local_variables = INT
+    { Function (function_name, num_local_variables)  }
+  | CALL ; function_name = SYMBOL ; num_arguments = INT
+    { Call (function_name, num_arguments) }
   | RETURN { Return }
 ;
 
