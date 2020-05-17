@@ -8,13 +8,33 @@
  * Note: Jack compilers implement multiplication and division using OS method calls.
  */
 class Math {
+    static int NUM_BITS_;  /** number of bits in int */
+    static int NUM_BITS_DIV_2_;  /** NUM_BITS_ / 2 */
+    static Array two_pow_;  /** two_pow[j] = 2 ** j */
+    static int scratch_;
 
     /** Initializes the library. */
     function void init() {
+      var int i;
+      let NUM_BITS_ = 16;
+      let NUM_BITS_DIV_2_ = 8;
+      let two_pow_ = Array.new(NUM_BITS_);
+      let two_pow_[0] = 1;
+      let i = 1;
+      while (i < NUM_BITS_) {
+        let two_pow_[i] = two_pow_[i - 1] + two_pow_[i - 1];
+        let i = i + 1;
+      }
+      return;
     }
 
     /** Returns the absolute value of x. */
     function int abs(int x) {
+      if (x < 0) {
+        return (-x);
+      } else {
+        return x;
+      }
     }
 
     /** Returns the product of x and y. 
@@ -23,25 +43,97 @@ class Math {
      *  the Jack expressions x*y and multiply(x,y) return the same value.
      */
     function int multiply(int x, int y) {
+      var int sum, shifted_x, i;
+      let sum = 0;
+      let shifted_x = x;
+      let i = 0;
+      while (i < NUM_BITS_) {
+        if (y & two_pow_[i]) {
+          let sum = sum + shifted_x;
+        }
+        let shifted_x = shifted_x + shifted_x;
+        let i = i + 1;
+      }
+      return sum;
     }
 
     /** Returns the integer part of x/y.
      *  When a Jack compiler detects the multiplication operator '/' in the 
      *  program's code, it handles it by invoking this method. In other words,
      *  the Jack expressions x/y and divide(x,y) return the same value.
+     *
+     *  Hangs indefinitely if y = 0.
      */
     function int divide(int x, int y) {
+      var int quotient;
+      var boolean negated;
+      let negated = false;
+      if (x < 0) {
+        let x = -x;
+        let negated = ~negated;
+      }
+      if (y < 0) {
+        let y = -y;
+        let negated = ~negated;
+      }
+
+      let quotient = Math._divide_impl(x, y);
+      if (negated) {
+        let quotient = -quotient;
+      }
+      return quotient;
+    }
+
+    /** Division for x >= 0 and y > 0. */
+    function int _divide_impl(int x, int y) {
+      var int quotient;
+      /** scratch_ variable maintains (2 * quotient * y) */
+      if ((y > x) | (y < 0)) {
+        let scratch_ = 0;
+        return 0;
+      }
+
+      let quotient = Math._divide_impl(x, y + y);
+      if ((x - scratch_) < y) {
+        return 2 * quotient;
+      } else {
+        let scratch_ = scratch_ + y;
+        return (2 * quotient) + 1;
+      }
     }
 
     /** Returns the integer part of the square root of x. */
     function int sqrt(int x) {
+      var int root, i, next_root, next_root_sq;
+      let root = 0;
+
+      let i = NUM_BITS_DIV_2_;
+      while (i > 0) {
+        let i = i - 1;
+        let next_root = root + two_pow_[i];
+        let next_root_sq = next_root * next_root;
+        if ((~(next_root_sq > x)) & (next_root_sq > 0)) {
+          let root = next_root;
+        }
+      }
+      return root;
     }
 
     /** Returns the greater number. */
     function int max(int a, int b) {
+      if (a > b) {
+        return a;
+      } else {
+        return b;
+      }
     }
 
     /** Returns the smaller number. */
     function int min(int a, int b) {
+      if (a < b) {
+        return a;
+      } else {
+        return b;
+      }
     }
 }
