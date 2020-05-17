@@ -11,54 +11,137 @@
  * string-oriented operations.
  */
 class String {
+    field Array array_;
+    field int length_, capacity_;
 
     /** constructs a new empty string with a maximum length of maxLength
      *  and initial length of 0. */
     constructor String new(int maxLength) {
+      if (maxLength < 0) {
+        let maxLength = 0;
+      }
+      let array_ = Array.new(maxLength);
+      let length_ = 0;
+      let capacity_ = maxLength;
+      return this;
     }
 
     /** Disposes this string. */
     method void dispose() {
+      do Array.dispose(array_);
+      return;
     }
 
     /** Returns the current length of this string. */
     method int length() {
+      return length_;
     }
 
     /** Returns the character at the j-th location of this string. */
     method char charAt(int j) {
+      if ((j < 0) | (~(j < length_))) {
+        return 0;
+      }
+      return array_[j];
     }
 
     /** Sets the character at the j-th location of this string to c. */
     method void setCharAt(int j, char c) {
+      if ((j < 0) | (~(j < length_))) {
+        return;
+      }
+      let array_[j] = c;
+      return;
     }
 
     /** Appends c to this string's end and returns this string. */
     method String appendChar(char c) {
+      if (length_ < capacity_) {
+        let array_[length_] = c;
+        let length_ = length_ + 1;
+      }
+      return this;
     }
 
     /** Erases the last character from this string. */
     method void eraseLastChar() {
+      if (length_ > 0) {
+        let length_ = length_ - 1;
+      }
+      return;
     }
 
     /** Returns the integer value of this string, 
      *  until a non-digit character is detected. */
     method int intValue() {
+      var int value, i, ch, digit;
+      var boolean negative;
+      let value = 0;
+      let negative = false;
+      let i = 0;
+      if ((length_ > 0) & (array_[0] = 45)) {
+        let negative = true;
+        let i = i + 1;
+      }
+
+      while (i < length_) {
+        let ch = array_[i];
+        let digit = ch - 48;
+        if ((digit < 0) | (digit > 9)) {
+          if (negative) {
+            return -value;
+          } else {
+            return value;
+          }
+        }
+        let value = (value * 10) + digit;
+        let i = i + 1;
+      }
+      if (negative) {
+        return -value;
+      } else {
+        return value;
+      }
     }
 
     /** Sets this string to hold a representation of the given value. */
     method void setInt(int val) {
+      var int last_digit, div_result;
+      let length_ = 0;
+      if (capacity_ = 0) {
+        return;
+      }
+      if (val < 0) {
+        let array_[0] = 45;
+        let val = -val;
+        let length_ = 1;
+      }
+      if (val = 0) {
+        let array_[0] = 48;
+        let length_ = 1;
+      }
+      while ((val > 0) & (length_ < capacity_)) {
+        let div_result = val / 10;
+        let last_digit = val - (div_result * 10);
+        let array_[length_] = last_digit + 48;
+        let length_ = length_ + 1;
+        let val = div_result;
+      }
+      return;
     }
 
     /** Returns the new line character. */
     function char newLine() {
+      return 128;
     }
 
     /** Returns the backspace character. */
     function char backSpace() {
+      return 129;
     }
 
     /** Returns the double quote (") character. */
     function char doubleQuote() {
+      return 34;
     }
 }
