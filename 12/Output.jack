@@ -15,12 +15,23 @@
  * as a small filled square, indicates where the next character will be displayed.
  */
 class Output {
-
+    // Multiply by SHIFT_8_ to shift left by 8 bits.
+    static int SHIFT_8_;
+    // Mask for the low and high 8-bits of an integer.
+    static int MASK_LOW_, MASK_HIGH_;
+    static int CHAR_HEIGHT_, CHAR_WIDTH_;  // pixels
     // Character map for displaying characters
     static Array charMaps; 
+    static int cursor_row_, cursor_col_;
 
     /** Initializes the screen, and locates the cursor at the screen's top-left. */
     function void init() {
+      let SHIFT_8_ = 256;
+      let MASK_LOW_ = 255;
+      let MASK_HIGH_ = -256;
+      let cursor_row_ = 0;
+      let cursor_col_ = 0;
+      return;
     }
 
     // Initializes the character map array
@@ -71,7 +82,7 @@ class Output {
         do Output.create(64,30,51,51,59,59,59,27,3,30,0,0);  // @
         do Output.create(63,30,51,51,24,12,12,0,12,12,0,0);  // ?
 
-        do Output.create(65,0,0,0,0,0,0,0,0,0,0,0);          // A ** TO BE FILLED **
+        do Output.create(65,12,30,51,51,63,51,51,51,51,0,0); // A 
         do Output.create(66,31,51,51,51,31,51,51,51,31,0,0); // B
         do Output.create(67,28,54,35,3,3,3,35,54,28,0,0);    // C
         do Output.create(68,15,27,51,51,51,51,51,27,15,0,0); // D
@@ -176,28 +187,100 @@ class Output {
     /** Moves the cursor to the j-th column of the i-th row,
      *  and erases the character displayed there. */
     function void moveCursor(int i, int j) {
+      if (i < 0) {
+        let i = 0;
+      }
+      if (j < 0) {
+        let j = 0;
+      }
+      if (i > 22) {
+        let i = 22;
+      }
+      if (j > 63) {
+        let j = 63;
+      }
+      let cursor_row_ = i;
+      let cursor_col_ = j;
+      do Output._write_char(32);
+      return;
     }
 
     /** Displays the given character at the cursor location,
      *  and advances the cursor one column forward. */
     function void printChar(char c) {
+      do Output._write_char(c);
+      do Output.moveCursor(cursor_row_, cursor_col_ + 1);
+      return;
     }
 
     /** displays the given string starting at the cursor location,
      *  and advances the cursor appropriately. */
     function void printString(String s) {
+      var int length, i;
+      let length = s.length();
+      let i = 0;
+      while (i < length) {
+        do Output.printChar(s.charAt(i));
+        let i = i + 1;
+      }
+      return;
     }
 
     /** Displays the given integer starting at the cursor location,
      *  and advances the cursor appropriately. */
     function void printInt(int i) {
+      var String s;
+      let s = String.new(6);
+      do s.setInt(i);
+      do Output.printString(s);
+      return;
     }
 
     /** Advances the cursor to the beginning of the next line. */
     function void println() {
+      do Output.moveCursor(cursor_row_ + 1, 0);
+      return;
     }
 
     /** Moves the cursor one column back. */
     function void backSpace() {
+      do Output.moveCursor(cursor_row_, cursor_col_ - 1);
+      return;
+    }
+
+    /** Draws the given character at the cursor location. Does not move the
+     *  cursor. */
+    function void _write_char(char c) {
+      // row on the screen at which to write pixels
+      var int screen_row;
+      // column index of 16-bit block of bits at which to write pixels
+      var int screen_col_block;
+      // whether to write to the low 8 bits of the column block of bits or to
+      // the high 8 bits
+      var boolean is_low_bits;
+      var int i;
+      // current value of screen at (screen_row + i, screen_col_block);
+      var int screen_val;
+      var int address;
+      var Array char_pixels;
+
+      let screen_row = cursor_row_ * 11;
+      let screen_col_block = cursor_col_ / 2;
+      let is_low_bits = ((screen_col_block + screen_col_block) = cursor_col_);
+      let char_pixels = charMaps[c];
+
+      let i = 0;
+      while (i < 8) {
+        let address = 16384 + (((screen_row + i) * 32) + screen_col_block);
+        let screen_val = Memory.peek(address);
+        if (is_low_bits) {
+          do Memory.poke(address, (screen_val & MASK_HIGH_) | char_pixels[i]);
+        } else {
+          do Memory.poke(
+            address, (char_pixels[i] * SHIFT_8_) | (screen_val & MASK_LOW_));
+        }
+        let i = i + 1;
+      }
+      return;
     }
 }

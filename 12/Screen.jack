@@ -10,34 +10,148 @@
  * the screen is indexed (0,0).
  */
 class Screen {
+    static Array two_pow_;  /** two_pow[j] = 2 ** j for j < 16 */
+    /** current drawing color -- true for black, white for false */
+    static boolean color_;
 
     /** Initializes the Screen. */
     function void init() {
+      var int i;
+      let two_pow_ = Array.new(16);
+      let two_pow_[0] = 1;
+      let i = 1;
+      while (i < 16) {
+        let two_pow_[i] = two_pow_[i - 1] + two_pow_[i - 1];
+        let i = i + 1;
+      }
+
+      let color_ = true;
+      return;
     }
 
     /** Erases the entire screen. */
     function void clearScreen() {
+      var int screen_address;
+      let screen_address = 16384;
+      while (screen_address < 24576) {
+        do Memory.poke(screen_address, 0);
+      }
+      return;
     }
 
     /** Sets the current color, to be used for all subsequent drawXXX commands.
      *  Black is represented by true, white by false. */
     function void setColor(boolean b) {
+      let color_ = b;
+      return;
     }
 
     /** Draws the (x,y) pixel, using the current color. */
     function void drawPixel(int x, int y) {
+      var int screen_address, address_value, column_index, column_bit;
+      let column_index = x / 16;
+      let column_bit = x - (column_index * 16);
+      let screen_address = 16384 + ((y * 32) + column_index);
+      let address_value = Memory.peek(screen_address);
+      if (color_) {
+        do Memory.poke(screen_address, address_value | two_pow_[column_bit]);
+      } else {
+        do Memory.poke(screen_address, address_value & (~two_pow_[column_bit]));
+      }
+      return;
     }
 
     /** Draws a line from pixel (x1,y1) to pixel (x2,y2), using the current color. */
     function void drawLine(int x1, int y1, int x2, int y2) {
+      var int overshoot, dx, dy, y_step, tmp;
+
+      /** For simplicity, keep x1 <= x2. */
+      if (x2 < x1) {
+        let tmp = x1;
+        let x1 = x2;
+        let x2 = tmp;
+        let tmp = y1;
+        let y1 = y2;
+        let y2 = tmp;
+      }
+
+      let dx = x2 - x1;
+      let dy = y2 - y1;
+
+      if (dx = 0) {  /** Straight vertical line */
+        if (dy < 0) {
+          let tmp = y1;
+          let y1 = y2;
+          let y2 = tmp;
+        }
+        while (y1 < y2) {
+          do Screen.drawPixel(x1, y1);
+          let y1 = y1 + 1;
+        }
+        return;
+      }
+      if (dy = 0) {  /** Straight horizontal line */
+        while (x1 < x2) {
+          do Screen.drawPixel(x1, y1);
+          let x1 = x1 + 1;
+        }
+        return;
+      }
+
+      if (dy > 0) {
+        let y_step = 1;
+      } else {
+        let y_step = -1;
+        let dy = -dy;
+      }
+
+      /** Let Y/X denote the absolute value of the slope of the line segment to
+       *  be drawn. Let b/a denote the absolute value of the slope of the line
+       *  segment from [original (x1, y1)] to [current drawn point].
+       *  `overshoot` maintains bX - aY. Checking the sign of `overshoot` is
+       *  equivalent to checking whether b/a < Y/X holds. */
+      let overshoot = 0;
+      while (~((x1 = x2) & (y1 = y2))) {
+        do Screen.drawPixel(x1, y1);
+        if (overshoot < 0) {
+          let y1 = y1 + y_step;
+          let overshoot = overshoot + dx;
+        } else {
+          let x1 = x1 + 1;
+          let overshoot = overshoot - dy;
+        }
+      }
+      return;
     }
 
     /** Draws a filled rectangle whose top left corner is (x1, y1)
      * and bottom right corner is (x2,y2), using the current color. */
     function void drawRectangle(int x1, int y1, int x2, int y2) {
+      var int tmp, y;
+      if (x2 < x1) {
+        let tmp = x1;
+        let x1 = x2;
+        let x2 = tmp;
+      }
+      while (x1 < x2) {
+        do Screen.drawLine(x1, y1, x1, y2);
+        let x1 = x1 + 1;
+      }
+      return;
     }
 
     /** Draws a filled circle of radius r<=181 around (x,y), using the current color. */
     function void drawCircle(int x, int y, int r) {
+      var int dy, line_radius;
+      /** Draw the circle row by row. */
+      let dy = -r;
+      let y = y + dy;
+      while (~(dy > r)) {
+        let line_radius = Math.sqrt(r * r - dy * dy);
+        do Screen.drawLine(x - line_radius, y, x + line_radius, y);
+        let dy = dy + 1;
+        let y = y + 1;
+      }
+      return;
     }
 }
