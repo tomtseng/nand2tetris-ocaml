@@ -20,7 +20,9 @@ class String {
       if (maxLength < 0) {
         let maxLength = 0;
       }
-      let array_ = Array.new(maxLength);
+      if (maxLength > 0) {
+        let array_ = Array.new(maxLength);
+      }
       let length_ = 0;
       let capacity_ = maxLength;
       return this;
@@ -28,7 +30,9 @@ class String {
 
     /** Disposes this string. */
     method void dispose() {
-      do Array.dispose(array_);
+      if (capacity_ > 0) {
+        do array_.dispose();
+      }
       return;
     }
 
@@ -106,26 +110,36 @@ class String {
 
     /** Sets this string to hold a representation of the given value. */
     method void setInt(int val) {
-      var int last_digit, div_result;
+      var int div_result, last_digit, left_pointer, right_pointer, tmp;
       let length_ = 0;
-      if (capacity_ = 0) {
-        return;
-      }
       if (val < 0) {
-        let array_[0] = 45;
+        do appendChar(45);  // -
         let val = -val;
-        let length_ = 1;
       }
       if (val = 0) {
-        let array_[0] = 48;
-        let length_ = 1;
+        do appendChar(48);  // 0
       }
+
+      // Write digits in reverse order.
       while ((val > 0) & (length_ < capacity_)) {
         let div_result = val / 10;
         let last_digit = val - (div_result * 10);
-        let array_[length_] = last_digit + 48;
-        let length_ = length_ + 1;
+        do appendChar(last_digit + 48);
         let val = div_result;
+      }
+      // Reverse.
+      if (charAt(0) = 45) {  // negative value
+        let left_pointer = 1;
+      } else {
+        let left_pointer = 0;
+      }
+      let right_pointer = length_ - 1;
+      while (left_pointer < right_pointer) {
+        let tmp = charAt(left_pointer);
+        do setCharAt(left_pointer, array_[right_pointer]);
+        do setCharAt(right_pointer, tmp);
+        let left_pointer = left_pointer + 1;
+        let right_pointer = right_pointer - 1;
       }
       return;
     }

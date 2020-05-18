@@ -43,10 +43,14 @@ class Keyboard {
      * of the pressed key.
      */
     function char readChar() {
-      var char c;
-      let c = Keyboard.keyPressed();
-      while (c = 0) {
-        let c = Keyboard.keyPressed();
+      var char c, key;
+      let key = Keyboard.keyPressed();
+      while (key = 0) {
+        let key = Keyboard.keyPressed();
+      }
+      let c = key;
+      while (~(key = 0)) {
+        let key = Keyboard.keyPressed();
       }
       do Output.printChar(c);
       return c;
@@ -64,19 +68,16 @@ class Keyboard {
 
       let new_line = String.newLine();
       let backspace = String.backSpace();
-      let s = String.new(65);
-      let c = KeyBoard.readChar();
+      let s = String.new(256);
+      let c = Keyboard.readChar();
       while (~(c = new_line)) {
         if (c = backspace) {
-          do Output.backSpace();
           do s.eraseLastChar();
         } else {
-          do Output.printChar(c);
           do s.appendChar(c);
         }
         let c = Keyboard.readChar();
       }
-      do Output.println();
       return s;
     }   
 
