@@ -16,7 +16,8 @@ rule read =
   | newline { Lexing.new_line lexbuf; read lexbuf }
   | identifier { Parser.IDENTIFIER (Lexing.lexeme lexbuf) }
   | string_constant { Parser.STRING_CONSTANT (Lexing.lexeme lexbuf) }
-  | integer_constant { Parser.INT_CONSTANT (int_of_string (Lexing.lexeme lexbuf)) }
+  | integer_constant
+    { Parser.INTEGER_CONSTANT (int_of_string (Lexing.lexeme lexbuf)) }
   | "class" { Parser.CLASS }
   | "constructor" { Parser.CONSTRUCTOR }
   | "function" { Parser.FUNCTION }
@@ -40,8 +41,8 @@ rule read =
   | "return" { Parser.RETURN }
   | '{' { Parser.LEFT_BRACE }
   | '}' { Parser.RIGHT_BRACE }
-  | '(' { Parser.LEFT_PARENTHESIS }
-  | ')' { Parser.RIGHT_PARENTHESIS }
+  | '(' { Parser.LEFT_PAREN }
+  | ')' { Parser.RIGHT_PAREN }
   | '[' { Parser.LEFT_BRACKET }
   | ']' { Parser.RIGHT_BRACKET }
   | '.' { Parser.PERIOD }
