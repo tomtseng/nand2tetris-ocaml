@@ -1,23 +1,30 @@
+{
+open Core
+
+exception Lexical_error of string
+}
+
 let whitespace = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
 let single_line_comment = "//" [^'\r' '\n']*
-(* TODO(tomtseng): this won't work -- will greedily seek longest match *)
-let enclosed_comment = "/*" _* "*/"
 let identifier = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '_' '0'-'9']*
-(* TODO(tomtseng): this won't work -- will greedily seek longest match *)
-let string_constant = '"' [^'"' '\n'] '"'
 let integer_constant = ['0'-'9']+  (* Non-negative integer *)
 
 rule read =
   parse
   | whitespace { read lexbuf }
   | single_line_comment { read lexbuf }
-  | enclosed_comment { read lexbuf }
+  | "(*" { parse_enclosed_comment lexbuf; read lexbuf }
   | newline { Lexing.new_line lexbuf; read lexbuf }
   | identifier { Parser.IDENTIFIER (Lexing.lexeme lexbuf) }
-  | string_constant { Parser.STRING_CONSTANT (Lexing.lexeme lexbuf) }
   | integer_constant
     { Parser.INTEGER_CONSTANT (int_of_string (Lexing.lexeme lexbuf)) }
+  | '"'
+    {
+      let buffer = Buffer.create 16 in
+      Parser.STRING_CONSTANT (parse_string buffer lexbuf);
+      read lexbuf
+    }
   | "class" { Parser.CLASS }
   | "constructor" { Parser.CONSTRUCTOR }
   | "function" { Parser.FUNCTION }
@@ -59,4 +66,19 @@ rule read =
   | '=' { Parser.EQUALS }
   | '~' { Parser.BITWISE_NEGATE }
   | eof { Parser.EOF }
-  | _ { failwith ("Unexpected lexer input: " ^ Lexing.lexeme lexbuf) }
+  | _
+    {
+      raise
+        (Lexical_error ("Unexpected lexer input: " ^ Lexing.lexeme lexbuf))
+    }
+(* Parses /* */-style comments. Doesn't deal with nested comments properly *)
+and parse_enclosed_comment = parse
+  | "*/" { () }  (* end of comment *)
+  | newline { Lexing.new_line lexbuf; enclosed_comment lexbuf }
+  | eof { raise (Lexical_error "Unterminated comment") }
+  | _ { enclosed_comment lexbuf }
+and parse_string buffer = parse
+  | '"' { Buffer.contents buffer }  (* end of string *)
+  | '\r' | '\n' { raise (Lexical_error "Unexpected newline in string") }
+  | eof { raise (Lexical_error "Unterminated string") }
+  | _ as ch { Buffer.add_char buffer ch; parse_string buffer lexbuf }
