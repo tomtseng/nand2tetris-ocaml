@@ -50,9 +50,9 @@ program:
   | c = class_declaration; EOF { c }
 
 class_declaration:
-  | CLASS ; class_name = IDENTIFIER ; LEFT_BRACKET ;
+  | CLASS ; class_name = IDENTIFIER ; LEFT_BRACE ;
     var_decls = class_variable_declaration* ;
-    subroutines = subroutine_declaration* ; RIGHT_BRACKET ;
+    subroutines = subroutine_declaration* ; RIGHT_BRACE ;
     {
       Ast_types.{
         name = class_name ;
@@ -72,9 +72,9 @@ class_variable_type:
 
 subroutine_declaration:
   | fn_type = subroutine_type ; return_type = variable_type_or_void ;
-    fn_name = IDENTIFIER ; LEFT_PAREN ; params = typed_variable* ; RIGHT_PAREN
-    LEFT_BRACKET ; var_declarations = variable_declaration* ;
-    body = statement* ; RIGHT_BRACKET
+    fn_name = IDENTIFIER ; LEFT_PAREN ;
+    params = separated_list(COMMA, typed_variable) ; RIGHT_PAREN ; LEFT_BRACE ;
+    var_declarations = variable_declaration* ; body = statement* ; RIGHT_BRACE
     {
       Ast_types.{
         function_type = fn_type ;
@@ -132,7 +132,7 @@ else_block:
   | ELSE ; ss = statement_block { ss }
 
 statement_block:
-  | LEFT_BRACKET ; ss = statement* ; RIGHT_BRACKET { ss }
+  | LEFT_BRACE ; ss = statement* ; RIGHT_BRACE { ss }
 
 expression:
   | e = expression_term { e }
@@ -166,7 +166,7 @@ subroutine_call:
 
 lvalue:
   | var = IDENTIFIER { Ast_types.Variable var }
-  | var = IDENTIFIER ; LEFT_BRACE ; e = expression ; RIGHT_BRACE
+  | var = IDENTIFIER ; LEFT_BRACKET ; e = expression ; RIGHT_BRACKET
     { Ast_types.Array_element (var, e) }
 
 binary_operator:

@@ -10,13 +10,11 @@ let single_line_comment = "//" [^'\r' '\n']*
 let identifier = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '_' '0'-'9']*
 let integer_constant = ['0'-'9']+  (* Non-negative integer *)
 
-rule read =
-  parse
+rule read = parse
   | whitespace { read lexbuf }
   | single_line_comment { read lexbuf }
-  | "(*" { parse_enclosed_comment lexbuf; read lexbuf }
+  | "/*" { parse_enclosed_comment lexbuf; read lexbuf }
   | newline { Lexing.new_line lexbuf; read lexbuf }
-  | identifier { Parser.IDENTIFIER (Lexing.lexeme lexbuf) }
   | integer_constant
     { Parser.INTEGER_CONSTANT (int_of_string (Lexing.lexeme lexbuf)) }
   | '"' { Parser.STRING_CONSTANT (parse_string (Buffer.create 16) lexbuf) }
@@ -60,6 +58,7 @@ rule read =
   | '>' { Parser.GREATER_THAN }
   | '=' { Parser.EQUALS }
   | '~' { Parser.BITWISE_NEGATE }
+  | identifier { Parser.IDENTIFIER (Lexing.lexeme lexbuf) }
   | eof { Parser.EOF }
   | _
     {
