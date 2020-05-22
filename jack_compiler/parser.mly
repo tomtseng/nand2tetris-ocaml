@@ -43,7 +43,7 @@
 %token BITWISE_NEGATE
 %token EOF
 
-%start <unit> program
+%start <Ast_types.class_declaration> program
 %%
 
 program:
@@ -54,9 +54,9 @@ class_declaration:
     var_decls = class_variable_declaration* ;
     subroutines = subroutine_declaration* ; RIGHT_BRACKET ;
     {
-      {
+      Ast_types.{
         name = class_name ;
-        class_variables = var_decls ;
+        class_variables = List.concat var_decls ;
         subroutines = subroutines ;
       }
     }
@@ -76,12 +76,12 @@ subroutine_declaration:
     LEFT_BRACKET ; var_declarations = variable_declaration* ;
     body = statement* ; RIGHT_BRACKET
     {
-      {
+      Ast_types.{
         function_type = fn_type ;
         return_type = return_type ;
         function_name = fn_name ;
         parameters = params ;
-        variable_declarations = params ;
+        variable_declarations = List.concat var_declarations ;
         function_body = body ;
       }
     }
@@ -107,16 +107,16 @@ variable_type:
   | INT { Integer_type }
   | CHAR { Char_type }
   | BOOLEAN { Boolean_type }
-  | name = IDENTIFIER { Class_type name }
+  | name = IDENTIFIER { Object_type name }
 
 statement:
   | LET ; v = lvalue ; EQUALS ; e = expression ; SEMICOLON
-    { Let_statement (v, e) }
+    { Ast_types.Let_statement (v, e) }
   | IF ; LEFT_PAREN ; condition = expression ; RIGHT_PAREN ;
       true_block = statement_block ; false_block_option = else_block?
     {
       let false_block =
-        match false_block_option of
+        match false_block_option with
         | None -> []
         | Some statements -> statements
       in
@@ -144,7 +144,11 @@ expression_term:
   | str = STRING_CONSTANT { String_constant str }
   | keyword = keyword_constant { Keyword_constant keyword }
   | v = lvalue { Lvalue v }
-  | call = subroutine_call { Subroutine_call call }
+  | call = subroutine_call
+    {
+      let (subroutine_name, parameters) = call in
+      Subroutine_call (subroutine_name, parameters)
+    }
   | LEFT_PAREN; e = expression; RIGHT_PAREN { e }
   | op = unary_operator ; e = expression_term { Unary_operator (op, e) }
 
@@ -161,12 +165,12 @@ subroutine_call:
     RIGHT_PAREN { (name, es) }
 
 lvalue:
-  | var = IDENTIFIER { Variable var }
+  | var = IDENTIFIER { Ast_types.Variable var }
   | var = IDENTIFIER ; LEFT_BRACE ; e = expression ; RIGHT_BRACE
-    { Array_element (var, e) }
+    { Ast_types.Array_element (var, e) }
 
 binary_operator:
-  | PLUS { Plus }
+  | PLUS { Ast_types.Plus }
   | MINUS { Minus }
   | MULTIPLY { Multiply }
   | DIVIDE { Divide }

@@ -19,12 +19,7 @@ rule read =
   | identifier { Parser.IDENTIFIER (Lexing.lexeme lexbuf) }
   | integer_constant
     { Parser.INTEGER_CONSTANT (int_of_string (Lexing.lexeme lexbuf)) }
-  | '"'
-    {
-      let buffer = Buffer.create 16 in
-      Parser.STRING_CONSTANT (parse_string buffer lexbuf);
-      read lexbuf
-    }
+  | '"' { Parser.STRING_CONSTANT (parse_string (Buffer.create 16) lexbuf) }
   | "class" { Parser.CLASS }
   | "constructor" { Parser.CONSTRUCTOR }
   | "function" { Parser.FUNCTION }
@@ -60,7 +55,7 @@ rule read =
   | '*' { Parser.MULTIPLY }
   | '/' { Parser.DIVIDE }
   | '&' { Parser.BITWISE_AND }
-  | '|' { Parser.BITIWSE_OR }
+  | '|' { Parser.BITWISE_OR }
   | '<' { Parser.LESS_THAN }
   | '>' { Parser.GREATER_THAN }
   | '=' { Parser.EQUALS }
@@ -74,9 +69,9 @@ rule read =
 (* Parses /* */-style comments. Doesn't deal with nested comments properly *)
 and parse_enclosed_comment = parse
   | "*/" { () }  (* end of comment *)
-  | newline { Lexing.new_line lexbuf; enclosed_comment lexbuf }
+  | newline { Lexing.new_line lexbuf; parse_enclosed_comment lexbuf }
   | eof { raise (Lexical_error "Unterminated comment") }
-  | _ { enclosed_comment lexbuf }
+  | _ { parse_enclosed_comment lexbuf }
 and parse_string buffer = parse
   | '"' { Buffer.contents buffer }  (* end of string *)
   | '\r' | '\n' { raise (Lexical_error "Unexpected newline in string") }

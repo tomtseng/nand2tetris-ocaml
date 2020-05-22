@@ -1,3 +1,8 @@
+(executable
+ (name jack_compiler)
+ (libraries core stdio)
+ (preprocess (pps ppx_jane)))
+
 (rule
  (targets lexer.ml)
  (deps lexer.mll)
