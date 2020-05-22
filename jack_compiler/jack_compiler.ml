@@ -48,6 +48,64 @@ let parse_with_error (lexbuf : Lexing.lexbuf) : Ast_types.class_declaration =
     fprintf stderr "%a: syntax error\n" print_position lexbuf;
     exit (-1)
 
+(** print out lexed tokens.
+    TODO(tomtseng): remove this, this is for debugging *)
+let print_lex (lexbuf : Lexing.lexbuf) : Ast_types.class_declaration =
+  let open Parser in
+  let token_to_string = function
+  | INTEGER_CONSTANT i -> Printf.sprintf "INTEGER_CONSTANT(%d)" i
+  | IDENTIFIER str -> Printf.sprintf "IDENTIFIER(%s)" str
+  | STRING_CONSTANT str -> Printf.sprintf "STRING_CONSTANT(%s)" str
+  | CLASS -> "CLASS"
+  | CONSTRUCTOR -> "CONSTRUCTOR"
+  | FUNCTION -> "FUNCTION"
+  | METHOD -> "METHOD"
+  | FIELD -> "FIELD"
+  | STATIC -> "STATIC"
+  | VAR -> "VAR"
+  | INT -> "INT"
+  | CHAR -> "CHAR"
+  | BOOLEAN -> "BOOLEAN"
+  | VOID -> "VOID"
+  | TRUE -> "TRUE"
+  | FALSE -> "FALSE"
+  | NULL -> "NULL"
+  | THIS -> "THIS"
+  | LET -> "LET"
+  | DO -> "DO"
+  | IF -> "IF"
+  | ELSE -> "ELSE"
+  | WHILE -> "WHILE"
+  | RETURN -> "RETURN"
+  | LEFT_BRACE -> "LEFT_BRACE"
+  | RIGHT_BRACE -> "RIGHT_BRACE"
+  | LEFT_PAREN -> "LEFT_PAREN"
+  | RIGHT_PAREN -> "RIGHT_PAREN"
+  | LEFT_BRACKET -> "LEFT_BRACKET"
+  | RIGHT_BRACKET -> "RIGHT_BRACKET"
+  | PERIOD -> "PERIOD"
+  | COMMA -> "COMMA"
+  | SEMICOLON -> "SEMICOLON"
+  | PLUS -> "PLUS"
+  | MINUS -> "MINUS"
+  | MULTIPLY -> "MULTIPLY"
+  | DIVIDE -> "DIVIDE"
+  | BITWISE_AND -> "BITWISE_AND"
+  | BITWISE_OR -> "BITWISE_OR"
+  | LESS_THAN -> "LESS_THAN"
+  | GREATER_THAN -> "GREATER_THAN"
+  | EQUALS -> "EQUALS"
+  | BITWISE_NEGATE -> "BITWISE_NEGATE"
+  | EOF -> "EOF"
+  in
+  let rec loop () =
+    match (Lexer.read lexbuf) with
+    | EOF -> Printf.printf "%s\n" (token_to_string EOF)
+    | token -> Printf.printf "%s " (token_to_string token); loop ()
+  in
+  loop ();
+  Ast_types.{ name = "dummy" ; class_variables = [] ; subroutines = [] }
+
 (** Runs the compiler on the input path. *)
 let run_compiler (input_path : string) : unit =
   let input_files = get_input_files input_path in
