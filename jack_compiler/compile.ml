@@ -1,6 +1,8 @@
 (** Contains compiler logic for transforming Jack AST to VM code. *)
 open Core
 
+exception Compile_error of string
+
 (** Adds class symbol to symbol table. *)
 let add_class_symbol_exn
     (symbols : Symbol_table.t)
@@ -8,7 +10,8 @@ let add_class_symbol_exn
   : unit =
   match Symbol_table.add symbols var_name var_type (Class_scope var_kind) with
   | `Ok -> ()
-  | `Duplicate -> failwith (Printf.sprintf "Duplicate symbol %s" var_name)
+  | `Duplicate ->
+    raise (Compile_error (Printf.sprintf "Duplicate symbol %s" var_name))
 
 let add_subroutine_symbol_exn
     (symbols : Symbol_table.t)
@@ -19,7 +22,8 @@ let add_subroutine_symbol_exn
     Symbol_table.add symbols var_name var_type (Subroutine_scope var_kind)
   with
   | `Ok -> ()
-  | `Duplicate -> failwith (Printf.sprintf "Duplicate symbol %s" var_name)
+  | `Duplicate ->
+    raise (Compile_error (Printf.sprintf "Duplicate symbol %s" var_name))
 
 let find_symbol_exn
     (symbols : Symbol_table.t)
@@ -27,7 +31,8 @@ let find_symbol_exn
   : Symbol_table.symbol_info =
   match Symbol_table.find symbols var_name with
   | Some info -> info
-  | None -> failwith (Printf.sprintf "unknown variable %s" var_name)
+  | None ->
+    raise (Compile_error (Printf.sprintf "Unknown variable %s" var_name))
 
 (* Gets the VM declaration of a subroutine. *)
 let get_subroutine_declaration
