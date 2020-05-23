@@ -3,8 +3,8 @@
 type t
 
 type subroutine_symbol_kind =
-  | Argument  (* function argument *)
-  | Local  (* local variable *)
+  | Argument  (** function argument *)
+  | Local  (** local variable *)
 
 (** Scope and kind of a symbol. *)
 type symbol_kind =

@@ -35,7 +35,6 @@ module Make_scoped_symbol_table(Kind : Scoped_symbol_kind)
   type scoped_symbol_info = {
     variable_type : Ast_types.variable_type ;
     kind : Kind.t ;
-    (* this symbol is the index-th of symbol of its kind in the table *)
     index : int ;
   }
 

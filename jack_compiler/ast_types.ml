@@ -7,8 +7,8 @@ type variable_type =
 type typed_variable = variable_type * string
 
 type class_variable_kind =
-  | Static  (* one instance of variable for class *)
-  | Field  (* one instance of variable for each object *)
+  | Static  (** one instance of variable for class *)
+  | Field  (** one instance of variable for each object *)
 
 type class_variable = class_variable_kind * typed_variable
 
@@ -18,9 +18,8 @@ type subroutine_type =
   | Method_type
 
 type subroutine_name =
-  (* includes constructor functions *)
-  | Function_name of string
-  | Method_name of string * string  (* class/object name, method name *)
+  | This_call of string  (** method call from [this] pointer *)
+  | Other_call of string * string
 
 type keyword_constant =
   | True
@@ -52,8 +51,8 @@ type expression =
   | Binary_operator of binary_operator * expression * expression
   | Unary_operator of unary_operator * expression
 and lvalue =
-  | Variable of string  (* name of variable *)
-  | Array_element of string * expression  (* name of array, index into array *)
+  | Variable of string  (** name of variable *)
+  | Array_element of string * expression  (** name of array, index into array *)
 
 type statement =
   | Let_statement of lvalue * expression

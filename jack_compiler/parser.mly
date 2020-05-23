@@ -160,9 +160,9 @@ expression_list:
   | es = separated_list(COMMA, expression) { es }
 
 subroutine_name:
-  | name = IDENTIFIER { Function_name name }
+  | name = IDENTIFIER { This_call name }
   | object_name = IDENTIFIER ; PERIOD ; method_name = IDENTIFIER
-    { Method_name (object_name, method_name) }
+    { Other_call (object_name, method_name) }
 
 subroutine_call:
   | name = subroutine_name ; LEFT_PAREN ; es = expression_list ;

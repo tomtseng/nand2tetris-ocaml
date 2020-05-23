@@ -3,6 +3,11 @@ open Core
 
 exception Compile_error of string
 
+type compiler_state = {
+  class_name : string ;
+  symbols : Symbol_table.t ;
+}
+
 (** Adds class symbol to symbol table. *)
 let add_class_symbol_exn
     (symbols : Symbol_table.t)
@@ -99,7 +104,7 @@ let unary_operator_command : Ast_types.unary_operator -> string = function
 (** Compiles an expression, leaving the result of the expression at the top of
     the VM stack. *)
 let rec compile_expression
-    (symbols: Symbol_table.t) (e : Ast_types.expression) : string list =
+    (state : compiler_state) (e : Ast_types.expression) : string list =
   match e with
   | Integer_constant i -> [ Printf.sprintf "push constant %d" i ]
   | String_constant str ->
@@ -132,18 +137,18 @@ let rec compile_expression
       | This -> [ "push pointer 0" ]
     end
   | Lvalue lval ->
-    let (lval_setup, lval_location) = compile_lvalue symbols lval in
+    let (lval_setup, lval_location) = compile_lvalue state lval in
     lval_setup @ [ "push " ^ lval_location ]
   | Subroutine_call (name, parameters) ->
-    compile_subroutine_call symbols name parameters
+    compile_subroutine_call state name parameters
   | Binary_operator (op, e1, e2) ->
     List.concat [
-      compile_expression symbols e1 ;
-      compile_expression symbols e2 ;
+      compile_expression state e1 ;
+      compile_expression state e2 ;
       [binary_operator_command op] ;
     ]
   | Unary_operator (op, e1) ->
-    (compile_expression symbols e1) @ [unary_operator_command op]
+    (compile_expression state e1) @ [unary_operator_command op]
 
 (** Compiles an l-value expression, returning
     (1) VM instructions to set up the expression,
@@ -151,21 +156,20 @@ let rec compile_expression
 
     The VM instructions may modify the VM [that] pointer. *)
 and compile_lvalue
-    (symbols: Symbol_table.t) (lval : Ast_types.lvalue)
-  : string list * string =
+    (state : compiler_state) (lval : Ast_types.lvalue) : string list * string =
   match lval with
   | Variable var_name ->
-    let var_info = find_symbol_exn symbols var_name in
+    let var_info = find_symbol_exn state.symbols var_name in
     let var_location = symbol_info_to_memory_location var_info in
     ([], var_location)
   | Array_element (arr_name, index) ->
-    let var_info = find_symbol_exn symbols arr_name in
+    let var_info = find_symbol_exn state.symbols arr_name in
     let arr_base_location = symbol_info_to_memory_location var_info in
     (List.concat
        [
          (* Store address of array element in [that] pointer. *)
          [ "push " ^ arr_base_location ] ;
-         compile_expression symbols index ;
+         compile_expression state index ;
          [
            "add" ;
            "pop pointer 1" ;
@@ -176,80 +180,86 @@ and compile_lvalue
 (** Compiles a subroutine call, leaving the result at the top of the VM stack.
 *)
 and compile_subroutine_call
-    (symbols: Symbol_table.t)
-    (name : Ast_types.subroutine_name)
+    (state : compiler_state)
+    (subroutine_name : Ast_types.subroutine_name)
     (parameters : Ast_types.expression list)
   : string list =
-  (* If this is a method call from an object, push the object as the first
-     argument. *)
-  let push_object_command_opt : string option =
-    Option.(
-      return name
-      >>= (function
-          | Function_name _ -> None
-          | Method_name (qualifier, _method_name) -> Some qualifier)
-      >>= Symbol_table.find symbols
-      >>= (fun symbol_info ->
-          match symbol_info.variable_type with
-          | Integer_type | Char_type | Boolean_type -> None
-          | Object_type _obj_type -> Some symbol_info)
-      >>| (fun symbol_info ->
-          "push " ^ (symbol_info_to_memory_location symbol_info))
-    )
+  (* (1) Name of class for the subroutine.
+     (2) Name of the function within the class.
+     (3) Command to push object as the first argument if function is a
+         method call on an object. *)
+  let (func_class_name, func_method_name, push_object_command_opt)
+    : string * string * string option =
+    match subroutine_name with
+    | This_call method_name ->
+      (state.class_name, method_name, Some "push pointer 0")
+    | Other_call (qualifier, method_name) ->
+      match Symbol_table.find state.symbols qualifier with
+      | None -> (qualifier, method_name, None)
+      | Some symbol_info ->
+        match symbol_info.variable_type with
+        | Integer_type | Char_type | Boolean_type ->
+          (qualifier, method_name, None)
+        | Object_type obj_type ->
+          (obj_type,
+           method_name,
+           Some ("push " ^ (symbol_info_to_memory_location symbol_info)))
   in
-  let push_object : string list =
+  let full_subroutine_name =
+    String.concat ~sep:"." [ func_class_name ; func_method_name ]
+  in
+  let push_object_command =
     match push_object_command_opt with
     | Some x -> [ x ]
     | None -> []
   in
-  let name_str =
-    match name with
-    | Function_name str -> str
-    | Method_name (qualifier, method_name) ->
-      String.concat ~sep:"." [ qualifier ; method_name ]
-  in
   List.concat [
-    push_object ;
-    List.(parameters >>= compile_expression symbols) ;
-    [ "call " ^ name_str ] ;
+    push_object_command ;
+    List.(parameters >>= compile_expression state) ;
+    [ "call " ^ full_subroutine_name ] ;
   ]
 
 (** Compiles a let statement assigning [rval] to [lval]. *)
 let compile_let_statement
-    (symbols : Symbol_table.t)
+    (state : compiler_state)
     (lval : Ast_types.lvalue)
     (rval : Ast_types.expression)
   : string list =
-  let compiled_rval = compile_expression symbols rval in
-  let (lval_setup, lval_location) = compile_lvalue symbols lval in
+  let compiled_rval = compile_expression state rval in
+  let (lval_setup, lval_location) = compile_lvalue state lval in
   List.concat [ compiled_rval ; lval_setup ; ["pop " ^ lval_location] ]
 
 (** Compiles a statement. *)
 let compile_statement
-    (symbols : Symbol_table.t) (statement : Ast_types.statement) : string list =
+    (state : compiler_state) (statement : Ast_types.statement) : string list =
   match statement with
-  | Let_statement (lval, rval) -> compile_let_statement symbols lval rval
+  | Let_statement (lval, rval) -> compile_let_statement state lval rval
   | If_statement _ | While_statement _ | Do_statement _ | Return_statement _ ->
     ["TODO"]
 
 (** Compiles a subroutine. *)
 let compile_subroutine
-    (symbols : Symbol_table.t)
-    (class_name : string)
+    (state : compiler_state)
     (subroutine : Ast_types.subroutine)
   : string list =
-  Symbol_table.reset_subroutine_scope symbols;
-  let declaration = get_subroutine_declaration class_name subroutine in
-  let pointer_setup = get_this_pointer_setup symbols subroutine in
+  Symbol_table.reset_subroutine_scope state.symbols;
+  let declaration = get_subroutine_declaration state.class_name subroutine in
+  let pointer_setup = get_this_pointer_setup state.symbols subroutine in
   List.iter
-    subroutine.parameters ~f:(add_subroutine_symbol_exn symbols Argument);
+    subroutine.parameters ~f:(add_subroutine_symbol_exn state.symbols Argument);
   List.iter
-    subroutine.local_variables ~f:(add_subroutine_symbol_exn symbols Local);
-  let body = List.(subroutine.function_body >>= compile_statement symbols) in
+    subroutine.local_variables
+    ~f:(add_subroutine_symbol_exn state.symbols Local);
+  let body = List.(subroutine.function_body >>= compile_statement state)
+  in
   List.concat [ declaration ; pointer_setup ; body ]
 
 (** Compiles Jack code to VM code as a list of strings. *)
 let compile_program (program : Ast_types.class_declaration) : string list =
   let symbol_table = Symbol_table.create () in
   List.iter program.class_variables ~f:(add_class_symbol_exn symbol_table);
-  List.(program.subroutines >>= compile_subroutine symbol_table program.name)
+  let state = {
+    class_name = program.name ;
+    symbols = symbol_table ;
+  } in
+  List.(program.subroutines >>= compile_subroutine state)
