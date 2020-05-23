@@ -81,7 +81,7 @@ subroutine_declaration:
         return_type = return_type ;
         function_name = fn_name ;
         parameters = params ;
-        variable_declarations = List.concat var_declarations ;
+        local_variables = List.concat var_declarations ;
         function_body = body ;
       }
     }

@@ -13,6 +13,18 @@ let add_class_symbol_exn
   | `Ok -> ()
   | `Duplicate -> failwith (Printf.sprintf "Duplicate symbol %s" var_name)
 
+let add_subroutine_symbol_exn
+    (symbol_table : Symbol_table.t)
+    (var_kind : Symbol_table.subroutine_symbol_kind)
+    ((var_type, var_name) : Ast_types.typed_variable)
+  : unit =
+  match
+    Symbol_table.add_symbol
+      symbol_table var_name var_type (Subroutine_scope var_kind)
+  with
+  | `Ok -> ()
+  | `Duplicate -> failwith (Printf.sprintf "Duplicate symbol %s" var_name)
+
 (* Gets the VM declaration of a subroutine. *)
 let get_subroutine_declaration
     (class_name : string) (subroutine : Ast_types.subroutine) : string =
@@ -41,6 +53,13 @@ let get_this_pointer_setup
   | Function_type -> []
   | Method_type -> [ "push argument 0" ; "pop pointer 0" ]
 
+(** Compiles a statement. *)
+let compile_statement
+    (_symbols : Symbol_table.t)
+    (_statement : Ast_types.statement)
+  : string =
+  "TODO"
+
 (** Compiles a subroutine. *)
 let compile_subroutine
     (symbols : Symbol_table.t)
@@ -50,7 +69,12 @@ let compile_subroutine
   Symbol_table.reset_subroutine_scope symbols;
   let declaration = get_subroutine_declaration class_name subroutine in
   let pointer_setup = get_this_pointer_setup symbols subroutine in
-  declaration :: pointer_setup
+  List.iter
+    subroutine.parameters ~f:(add_subroutine_symbol_exn symbols Argument);
+  List.iter
+    subroutine.local_variables ~f:(add_subroutine_symbol_exn symbols Local);
+  let body = List.map subroutine.function_body ~f:(compile_statement symbols) in
+  List.concat [[declaration] ; pointer_setup ; body ]
 
 (** Compiles Jack code to VM code as a list of strings. *)
 let compile_program (program : Ast_types.class_declaration) : string list =

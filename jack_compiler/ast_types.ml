@@ -68,7 +68,7 @@ type subroutine = {
   return_type : variable_type option ;
   function_name : string ;
   parameters : typed_variable list ;
-  variable_declarations : typed_variable list ;
+  local_variables : typed_variable list ;
   function_body : statement list ;
 }
 
