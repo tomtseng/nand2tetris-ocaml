@@ -69,11 +69,11 @@ type subroutine = {
   function_name : string ;
   parameters : typed_variable list ;
   variable_declarations : typed_variable list ;
-  function_body : statement list
+  function_body : statement list ;
 }
 
 type class_declaration = {
   name : string ;
-  class_variables: class_variable list;
-  subroutines : subroutine list;
+  class_variables: class_variable list ;
+  subroutines : subroutine list ;
 }

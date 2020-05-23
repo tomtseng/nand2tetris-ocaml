@@ -20,6 +20,7 @@ module type Scoped_symbol_table_intf = sig
     Ast_types.variable_type ->
     scoped_symbol_kind ->
     [ `Ok | `Duplicate ]
+  val count_of_kind : t -> scoped_symbol_kind -> int
 end
 
 module Make_scoped_symbol_table(Kind : Scoped_symbol_kind)
@@ -49,6 +50,10 @@ module Make_scoped_symbol_table(Kind : Scoped_symbol_kind)
       table.table
       ~key:var_name
       ~data:{ variable_type = var_type ; kind = var_kind ; index = count ; }
+
+  let count_of_kind table var_kind =
+    let counts_index = Kind.to_int var_kind in
+    Array.get table.kind_counts counts_index
 end
 
 type subroutine_symbol_kind = Argument | Local
@@ -85,11 +90,17 @@ let create () = {
 let add_symbol table var_name var_type var_kind =
   match var_kind with
   | Class_scope kind ->
-    Class_symbol_table.add_symbol
-      table.class_symbols var_name var_type kind
+    Class_symbol_table.add_symbol table.class_symbols var_name var_type kind
   | Subroutine_scope kind ->
     Subroutine_symbol_table.add_symbol
       table.subroutine_symbols var_name var_type kind
+
+let count_of_kind table var_kind =
+  match var_kind with
+  | Class_scope kind ->
+    Class_symbol_table.count_of_kind table.class_symbols kind
+  | Subroutine_scope kind ->
+    Subroutine_symbol_table.count_of_kind table.subroutine_symbols kind
 
 let reset_subroutine_scope table =
   table.subroutine_symbols <- Subroutine_symbol_table.create ()

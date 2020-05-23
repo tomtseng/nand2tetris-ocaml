@@ -19,5 +19,8 @@ val create : unit -> t
 val add_symbol :
   t -> string -> Ast_types.variable_type -> symbol_kind -> [ `Ok | `Duplicate ]
 
+(** [count_of_kind t kind] Returns the number of symbols of kind [kind]. *)
+val count_of_kind : t -> symbol_kind -> int
+
 (** Clear subroutine symbols. *)
 val reset_subroutine_scope : t -> unit

@@ -56,7 +56,7 @@ let run_compiler (input_path : string) : unit =
       lexbuf.lex_curr_p <-
         { lexbuf.lex_curr_p with pos_fname = input_filename };
       let jack_code = parse_with_error lexbuf in
-      let vm_code = Compile.compile jack_code in
+      let vm_code = Compile.compile_program jack_code in
       let output_filename = get_output_filename input_filename in
       Out_channel.write_lines output_filename vm_code)
 
