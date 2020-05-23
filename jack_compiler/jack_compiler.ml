@@ -2,7 +2,7 @@
 open Core
 open Stdio
 
-(** Returns `input_filename`, but with a ".vm" extension. *)
+(** Returns [input_filename], but with a ".vm" extension. *)
 let get_output_filename (input_filename : string) : string =
   let
     base_filename, (_ : string option) = Filename.split_extension input_filename
@@ -29,7 +29,7 @@ let get_input_files (input_path : string) : string list =
   | `Unknown ->
     failwith (Printf.sprintf "Can't determine file type: %s" input_path)
 
-(** Prints the position information in `lexbuf` to `out_channel`. *)
+(** Prints the position information in [lexbuf] to [out_channel]. *)
 let print_position
     (out_channel : Out_channel.t)
     (lexbuf : Lexing.lexbuf)

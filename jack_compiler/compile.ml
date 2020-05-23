@@ -45,7 +45,7 @@ let get_subroutine_declaration
   [ Printf.sprintf "function %s.%s %d"
       class_name subroutine.function_name num_vm_args ]
 
-(* Gets VM code for setting up the `this` pointer for a subroutine definition.
+(* Gets VM code for setting up the [this] pointer for a subroutine definition.
 *)
 let get_this_pointer_setup
     (symbols : Symbol_table.t)
@@ -149,7 +149,7 @@ let rec compile_expression
     (1) VM instructions to set up the expression,
     (2) "<memory segment> <index>" at which the l-value may be pushed/popped.
 
-    The VM instructions may modify the `that` pointer. *)
+    The VM instructions may modify the VM [that] pointer. *)
 and compile_lvalue
     (symbols: Symbol_table.t) (lval : Ast_types.lvalue)
   : string list * string =
@@ -163,7 +163,7 @@ and compile_lvalue
     let arr_base_location = symbol_info_to_memory_location var_info in
     (List.concat
        [
-         (* Store address of array element in `that` pointer. *)
+         (* Store address of array element in [that] pointer. *)
          [ "push " ^ arr_base_location ] ;
          compile_expression symbols index ;
          [

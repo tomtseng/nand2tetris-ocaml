@@ -57,7 +57,7 @@ and lvalue =
 
 type statement =
   | Let_statement of lvalue * expression
-  (* condition, statements if true, statements if false *)
+  (** condition, statements if true, statements if false *)
   | If_statement of expression * statement list * statement list
   | While_statement of expression * statement list
   | Do_statement of subroutine_name * expression list

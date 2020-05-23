@@ -14,7 +14,7 @@ type symbol_kind =
 type symbol_info = {
   variable_type : Ast_types.variable_type ;
   kind : symbol_kind ;
-  (* this symbol is the index-th of symbol of its kind in the table *)
+  (** this symbol is the index-th of symbol of its kind in the table *)
   index : int ;
 }
 
