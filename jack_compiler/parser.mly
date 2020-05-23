@@ -125,7 +125,11 @@ statement:
   | WHILE ; LEFT_PAREN ; condition = expression ; RIGHT_PAREN;
       statements = statement_block
     { While_statement (condition, statements) }
-  | DO ; call = subroutine_call ; SEMICOLON { Do_statement call }
+  | DO ; call = subroutine_call ; SEMICOLON
+    {
+      let (subroutine_name, parameters) = call in
+      Do_statement (subroutine_name, parameters)
+    }
   | RETURN ; e = expression? ; SEMICOLON { Return_statement e }
 
 else_block:

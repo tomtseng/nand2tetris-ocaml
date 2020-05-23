@@ -60,7 +60,7 @@ type statement =
   (* condition, statements if true, statements if false *)
   | If_statement of expression * statement list * statement list
   | While_statement of expression * statement list
-  | Do_statement of (subroutine_name * expression list)
+  | Do_statement of subroutine_name * expression list
   | Return_statement of expression option
 
 type subroutine = {
