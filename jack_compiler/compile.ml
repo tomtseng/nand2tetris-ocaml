@@ -8,28 +8,33 @@ type compiler_state = {
   symbols : Symbol_table.t ;
 }
 
-(** Adds class symbol to symbol table. *)
+(** Adds a symbol to the symbol table, raising an exception if the symbol is
+    already in the table. *)
+let add_symbol_exn
+    (symbols : Symbol_table.t)
+    ((var_type, var_name) : Ast_types.typed_variable)
+    ~kind:(var_kind : Symbol_table.symbol_kind)
+  : Symbol_table.t =
+  match Symbol_table.add symbols var_name var_type var_kind with
+  | `Ok new_symbols -> new_symbols
+  | `Duplicate ->
+    raise (Compile_error (Printf.sprintf "Duplicate symbol %s" var_name))
+
+(** Adds class variable to symbol table, raising an exception if the symbol is already
+    in the table. *)
 let add_class_symbol_exn
     (symbols : Symbol_table.t)
-    ((var_kind, (var_type, var_name)) : Ast_types.class_variable)
-  : unit =
-  match Symbol_table.add symbols var_name var_type (Class_scope var_kind) with
-  | `Ok -> ()
-  | `Duplicate ->
-    raise (Compile_error (Printf.sprintf "Duplicate symbol %s" var_name))
+    ((class_var_kind, typed_var) : Ast_types.class_variable)
+  : Symbol_table.t =
+  let var_kind : Symbol_table.symbol_kind =
+    match class_var_kind with
+    | Ast_types.Static -> Symbol_table.Static
+    | Ast_types.Field -> Symbol_table.Field
+  in
+  add_symbol_exn symbols typed_var ~kind:var_kind
 
-let add_subroutine_symbol_exn
-    (symbols : Symbol_table.t)
-    (var_kind : Symbol_table.subroutine_symbol_kind)
-    ((var_type, var_name) : Ast_types.typed_variable)
-  : unit =
-  match
-    Symbol_table.add symbols var_name var_type (Subroutine_scope var_kind)
-  with
-  | `Ok -> ()
-  | `Duplicate ->
-    raise (Compile_error (Printf.sprintf "Duplicate symbol %s" var_name))
-
+(** Find symbol in symbol table, raising an exception if the symbol is not in
+    the table. *)
 let find_symbol_exn
     (symbols : Symbol_table.t)
     (var_name : string)
@@ -58,9 +63,7 @@ let get_this_pointer_setup
   : string list =
   match subroutine.function_type with
   | Constructor_type ->
-    let num_object_fields =
-      Symbol_table.count_of_kind symbols (Class_scope Field)
-    in
+    let num_object_fields = Symbol_table.count_of_kind symbols Field in
     [
       Printf.sprintf "push constant %d" num_object_fields ;
       "call Memory.alloc" ;
@@ -77,10 +80,10 @@ let ignore_stack_top = "pop temp 7"
 let symbol_info_to_memory_location (info : Symbol_table.symbol_info) : string =
   let memory_segment =
     match info.kind with
-    | Class_scope Static -> "static"
-    | Class_scope Field -> "this"
-    | Subroutine_scope Argument -> "argument"
-    | Subroutine_scope Local -> "local"
+    | Argument -> "argument"
+    | Local -> "local"
+    | Static -> "static"
+    | Field -> "this"
   in
   Printf.sprintf "%s %d" memory_segment info.index
 
@@ -242,22 +245,32 @@ let compile_subroutine
     (state : compiler_state)
     (subroutine : Ast_types.subroutine)
   : string list =
-  Symbol_table.reset_subroutine_scope state.symbols;
   let declaration = get_subroutine_declaration state.class_name subroutine in
   let pointer_setup = get_this_pointer_setup state.symbols subroutine in
-  List.iter
-    subroutine.parameters ~f:(add_subroutine_symbol_exn state.symbols Argument);
-  List.iter
-    subroutine.local_variables
-    ~f:(add_subroutine_symbol_exn state.symbols Local);
-  let body = List.(subroutine.function_body >>= compile_statement state)
+  let subroutine_symbols =
+    List.fold
+      subroutine.parameters
+      ~init:state.symbols
+      ~f:(add_symbol_exn ~kind:Symbol_table.Argument)
+  in
+  let subroutine_symbols =
+    List.fold
+      subroutine.local_variables
+      ~init:subroutine_symbols
+      ~f:(add_symbol_exn ~kind:Symbol_table.Local)
+  in
+  let subroutine_state = { state with symbols = subroutine_symbols } in
+  let body =
+    List.(subroutine.function_body >>= compile_statement subroutine_state)
   in
   List.concat [ declaration ; pointer_setup ; body ]
 
 (** Compiles Jack code to VM code as a list of strings. *)
 let compile_program (program : Ast_types.class_declaration) : string list =
-  let symbol_table = Symbol_table.create () in
-  List.iter program.class_variables ~f:(add_class_symbol_exn symbol_table);
+  let symbol_table = Symbol_table.empty in
+  let symbol_table =
+    List.fold program.class_variables ~init:symbol_table ~f:add_class_symbol_exn
+  in
   let state = {
     class_name = program.name ;
     symbols = symbol_table ;
