@@ -6,11 +6,11 @@ type variable_type =
 
 type typed_variable = variable_type * string
 
-type class_variable_type =
+type class_variable_kind =
   | Static  (* one instance of variable for class *)
   | Field  (* one instance of variable for each object *)
 
-type class_variable = class_variable_type * typed_variable
+type class_variable = class_variable_kind * typed_variable
 
 type subroutine_type =
   | Constructor_type
