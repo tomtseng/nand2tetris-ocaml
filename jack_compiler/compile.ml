@@ -6,6 +6,8 @@ exception Compile_error of string
 type compiler_state = {
   class_name : string ;
   symbols : Symbol_table.t ;
+  (** Number of statements in the subroutine that have used a goto jump. *)
+  goto_count : int
 }
 
 (** Adds a symbol to the symbol table, raising an exception if the symbol is
@@ -222,23 +224,98 @@ and compile_subroutine_call
     [ "call " ^ full_subroutine_name ] ;
   ]
 
-(** Compiles a let statement assigning [rval] to [lval]. *)
-let compile_let_statement
-    (state : compiler_state)
-    (lval : Ast_types.lvalue)
-    (rval : Ast_types.expression)
-  : string list =
-  let compiled_rval = compile_expression state rval in
-  let (lval_setup, lval_location) = compile_lvalue state lval in
-  List.concat [ compiled_rval ; lval_setup ; ["pop " ^ lval_location] ]
-
 (** Compiles a statement. *)
-let compile_statement
-    (state : compiler_state) (statement : Ast_types.statement) : string list =
+let rec compile_statement
+    (state : compiler_state) (statement : Ast_types.statement)
+  : compiler_state * string list =
   match statement with
-  | Let_statement (lval, rval) -> compile_let_statement state lval rval
-  | If_statement _ | While_statement _ | Do_statement _ | Return_statement _ ->
-    ["TODO"]
+  | Let_statement (lval, rval) ->
+    let compiled_rval = compile_expression state rval in
+    let (lval_setup, lval_location) = compile_lvalue state lval in
+    (state,
+     List.concat [ compiled_rval ; lval_setup ; ["pop " ^ lval_location] ])
+  | Do_statement (func_name, params) ->
+    (state,
+     (compile_subroutine_call state func_name params)
+     @ [ ignore_stack_top  (* ignore return value *) ])
+  | Return_statement return_value_opt ->
+    let compiled_return =
+      match return_value_opt with
+      | None -> [ "push constant 0" ]
+      | Some expression -> compile_expression state expression
+    in
+    (state, compiled_return)
+  | If_statement (branch_condition, true_block, false_block) ->
+    compile_if_statement state branch_condition true_block false_block
+  | While_statement (while_condition, do_block) ->
+    compile_while_statement state while_condition do_block
+
+(** Compiles an if statement. *)
+and compile_if_statement
+    (state : compiler_state)
+    (branch_condition : Ast_types.expression)
+    (true_block : Ast_types.statement list)
+    (false_block : Ast_types.statement list)
+  : compiler_state * string list =
+  let label_id = state.goto_count in
+  let state = { state with goto_count = state.goto_count + 1 } in
+  let true_label = Printf.sprintf "if_true_%d" label_id in
+  let end_label = Printf.sprintf "if_end_%d" label_id in
+  let compiled_condition = compile_expression state branch_condition in
+  let (state, compiled_true_block) = compile_statements state true_block in
+  let (state, compiled_false_block) = compile_statements state false_block in
+  (state,
+   List.concat [
+     compiled_condition ;
+     [ Printf.sprintf "if-goto %s" true_label ] ;
+     compiled_false_block ;
+     [
+       Printf.sprintf "goto %s" end_label ;
+       Printf.sprintf "label %s" true_label ;
+     ] ;
+     compiled_true_block ;
+     [ Printf.sprintf "label %s" end_label ] ;
+   ])
+
+(** Compiles a while statement. *)
+and compile_while_statement
+    (state : compiler_state)
+    (while_condition : Ast_types.expression)
+    (do_block : Ast_types.statement list)
+  : compiler_state * string list =
+  let label_id = state.goto_count in
+  let state = { state with goto_count = state.goto_count + 1 } in
+  let condition_label = Printf.sprintf "while_cond_%d" label_id in
+  let do_label = Printf.sprintf "while_do_%d" label_id in
+  let compiled_condition = compile_expression state while_condition in
+  let (state, compiled_do_block) = compile_statements state do_block in
+  (state,
+   List.concat [
+     [
+       Printf.sprintf "goto %s" condition_label ;
+       Printf.sprintf "label %s" do_label ;
+     ] ;
+     compiled_do_block ;
+     [ Printf.sprintf "label %s" condition_label ] ;
+     compiled_condition ;
+     [ Printf.sprintf "if-goto %s" do_label ] ;
+   ])
+
+(** Compiles several statements. *)
+and compile_statements
+    (state : compiler_state) (statements : Ast_types.statement list)
+  : compiler_state * string list =
+  let (next_state, compilation_rev) =
+    List.fold
+      statements
+      ~init:(state, [])
+      ~f:(fun (state_acc, compilation_acc) -> fun statement ->
+          let (next_state, compiled_statement) =
+            compile_statement state_acc statement
+          in
+          (next_state, compiled_statement :: compilation_acc))
+  in
+  (next_state, compilation_rev |> List.rev |> List.concat)
 
 (** Compiles a subroutine. *)
 let compile_subroutine
@@ -260,10 +337,14 @@ let compile_subroutine
       ~f:(add_symbol_exn ~kind:Symbol_table.Local)
   in
   let subroutine_state = { state with symbols = subroutine_symbols } in
-  let body =
-    List.(subroutine.function_body >>= compile_statement subroutine_state)
+  let (_, body) =
+    compile_statements subroutine_state subroutine.function_body
   in
-  List.concat [ declaration ; pointer_setup ; body ]
+  List.concat [
+    declaration ;
+    pointer_setup ;
+    body
+  ]
 
 (** Compiles Jack code to VM code as a list of strings. *)
 let compile_program (program : Ast_types.class_declaration) : string list =
@@ -274,5 +355,6 @@ let compile_program (program : Ast_types.class_declaration) : string list =
   let state = {
     class_name = program.name ;
     symbols = symbol_table ;
+    goto_count = 0 ;
   } in
   List.(program.subroutines >>= compile_subroutine state)
