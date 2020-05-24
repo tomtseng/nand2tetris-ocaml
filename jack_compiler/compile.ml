@@ -70,9 +70,6 @@ let get_this_pointer_setup
   | Function_type -> []
   | Method_type -> [ "push argument 0" ; "pop pointer 0" ]
 
-(** VM code for popping and ignoring the top of the stack. *)
-let ignore_stack_top = "pop temp 7"
-
 (** Converts symbol info to the string representing the VM memory location
     holding the symbol. *)
 let symbol_info_to_memory_location (info : Symbol_table.symbol_info) : string =
@@ -112,23 +109,18 @@ let rec compile_expression
     List.concat
       [
         [
-          (* Allocate string and store as a temporary variable . *)
           Printf.sprintf "push constant %d" (String.length str) ;
           "call String.new 1" ;
-          "pop temp 0" ;
         ] ;
         List.(
           str
           |> String.to_list
           >>= (fun ch ->
               [
-                "push temp 0" ;
                 Printf.sprintf "push constant %d" (Char.to_int ch) ;
                 "call String.appendChar 2" ;
-                ignore_stack_top ;  (* ignore return value *)
               ])
         ) ;
-        [ "push temp 0" ] ;
       ]
   | Keyword_constant keyword ->
     begin
@@ -236,9 +228,9 @@ let rec compile_statement
     (state,
      List.concat [ compiled_rval ; lval_setup ; ["pop " ^ lval_location] ])
   | Do_statement (func_name, params) ->
+    let ignore_return_value = "pop temp 7" in
     (state,
-     (compile_subroutine_call state func_name params)
-     @ [ ignore_stack_top  (* ignore return value *) ])
+     (compile_subroutine_call state func_name params) @ [ ignore_return_value ])
   | Return_statement return_value_opt ->
     let compiled_return =
       match return_value_opt with
