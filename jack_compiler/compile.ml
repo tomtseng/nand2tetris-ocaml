@@ -49,13 +49,9 @@ let find_symbol_exn
 (* Gets the VM declaration of a subroutine. *)
 let get_subroutine_declaration
     (class_name : string) (subroutine : Ast_types.subroutine) : string list =
-  let num_vm_args =
-    match subroutine.function_type with
-    | Constructor_type | Function_type -> List.length subroutine.parameters
-    | Method_type -> (List.length subroutine.parameters) + 1
-  in
+  let num_local_variables = List.length subroutine.local_variables in
   [ Printf.sprintf "function %s.%s %d"
-      class_name subroutine.function_name num_vm_args ]
+      class_name subroutine.function_name num_local_variables ]
 
 (* Gets VM code for setting up the [this] pointer for a subroutine definition.
 *)
@@ -68,7 +64,7 @@ let get_this_pointer_setup
     let num_object_fields = Symbol_table.count_of_kind symbols Field in
     [
       Printf.sprintf "push constant %d" num_object_fields ;
-      "call Memory.alloc" ;
+      "call Memory.alloc 1" ;
       "pop pointer 0" ;
     ]
   | Function_type -> []
@@ -93,8 +89,8 @@ let symbol_info_to_memory_location (info : Symbol_table.symbol_info) : string =
 let binary_operator_command : Ast_types.binary_operator -> string = function
   | Plus -> "add"
   | Minus -> "sub"
-  | Multiply -> "call Math.multiply"
-  | Divide -> "call Math.divide"
+  | Multiply -> "call Math.multiply 2"
+  | Divide -> "call Math.divide 2"
   | Bitwise_and -> "and"
   | Bitwise_or -> "or"
   | Less_than -> "lt"
@@ -118,7 +114,7 @@ let rec compile_expression
         [
           (* Allocate string and store as a temporary variable . *)
           Printf.sprintf "push constant %d" (String.length str) ;
-          "call String.new" ;
+          "call String.new 1" ;
           "pop temp 0" ;
         ] ;
         List.(
@@ -128,7 +124,7 @@ let rec compile_expression
               [
                 "push temp 0" ;
                 Printf.sprintf "push constant %d" (Char.to_int ch) ;
-                "call String.appendChar" ;
+                "call String.appendChar 2" ;
                 ignore_stack_top ;  (* ignore return value *)
               ])
         ) ;
@@ -218,10 +214,15 @@ and compile_subroutine_call
     | Some x -> [ x ]
     | None -> []
   in
+  let num_args =
+    match push_object_command_opt with
+    | Some _ -> (List.length parameters) + 1
+    | None -> List.length parameters
+  in
   List.concat [
     push_object_command ;
     List.(parameters >>= compile_expression state) ;
-    [ "call " ^ full_subroutine_name ] ;
+    [ Printf.sprintf "call %s %d" full_subroutine_name num_args ] ;
   ]
 
 (** Compiles a statement. *)
@@ -241,8 +242,8 @@ let rec compile_statement
   | Return_statement return_value_opt ->
     let compiled_return =
       match return_value_opt with
-      | None -> [ "push constant 0" ]
-      | Some expression -> compile_expression state expression
+      | None -> [ "push constant 0" ; "return" ]
+      | Some expression -> (compile_expression state expression) @ [ "return" ]
     in
     (state, compiled_return)
   | If_statement (branch_condition, true_block, false_block) ->
@@ -324,11 +325,16 @@ let compile_subroutine
   : string list =
   let declaration = get_subroutine_declaration state.class_name subroutine in
   let pointer_setup = get_this_pointer_setup state.symbols subroutine in
+  (* Add [this] as argument to methods to make the argument indexing correct. *)
+  let params : Ast_types.typed_variable list =
+    match subroutine.function_type with
+    | Constructor_type | Function_type -> subroutine.parameters
+    | Method_type ->
+      (Object_type state.class_name, "this") :: subroutine.parameters
+  in
   let subroutine_symbols =
     List.fold
-      subroutine.parameters
-      ~init:state.symbols
-      ~f:(add_symbol_exn ~kind:Symbol_table.Argument)
+      params ~init:state.symbols ~f:(add_symbol_exn ~kind:Symbol_table.Argument)
   in
   let subroutine_symbols =
     List.fold
